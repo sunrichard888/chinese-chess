@@ -158,3 +158,29 @@ export function makeMove(board: Board, move: Move): Board {
     moveHistory: [...board.moveHistory, move],
   };
 }
+
+export function makeMove(board: Board, move: Move): Board {
+  const movingPiece = getPieceAt(board, move.from);
+  if (!movingPiece) {
+    return board;
+  }
+
+  // Create new pieces array with moved piece
+  const newPieces = board.pieces
+    .filter(
+      (p) =>
+        !(p.position.file === move.to.file && p.position.rank === move.to.rank)
+    )
+    .map((p) => {
+      if (p.position.file === move.from.file && p.position.rank === move.from.rank) {
+        return { ...p, position: move.to };
+      }
+      return p;
+    });
+
+  return {
+    pieces: newPieces,
+    turn: board.turn === Color.Red ? Color.Black : Color.Red,
+    moveHistory: [...board.moveHistory, move],
+  };
+}
