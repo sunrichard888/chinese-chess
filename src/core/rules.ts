@@ -6,7 +6,6 @@
 
 import { Board, Position, Color, Move, PieceType } from './types';
 import { getPieceAt, getPiecesByColor, findGeneral, makeMove } from './board';
-import { getValidMoves, getAllLegalMoves } from './moves';
 
 // ============================================================================
 // Check Detection

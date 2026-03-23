@@ -6,6 +6,8 @@
 
 import { Piece, Position, Color, PieceType, Move, createPiece, createPosition } from './types';
 
+export { isValidPosition } from './types';
+
 // ============================================================================
 // Board - Current state of all pieces
 // ============================================================================

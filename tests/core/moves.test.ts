@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { createInitialBoard, createPosition } from '../../src/core/board';
+import { createInitialBoard } from '../../src/core/board';
+import { createPosition, Color } from '../../src/core/types';
 import { getValidMoves, getChariotMoves, getHorseMoves, getCannonMoves } from '../../src/core/moves';
-import { Color } from '../../src/core/types';
 
 describe('Move Generation', () => {
   describe('Initial Position', () => {
@@ -54,10 +54,7 @@ describe('Move Generation', () => {
 
   describe('Horse (马) Movement', () => {
     it('can move in L-shapes when not blocked', () => {
-      // Create a test board with a horse in open space
       const board = createInitialBoard();
-      
-      // For this test, we'll just verify the move generation logic exists
       const moves = getHorseMoves(board, createPosition(1, 0));
       expect(Array.isArray(moves)).toBe(true);
     });

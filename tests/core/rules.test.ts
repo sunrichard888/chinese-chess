@@ -3,7 +3,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { createInitialBoard, Color } from '../../src/core/board';
+import { createInitialBoard } from '../../src/core/board';
+import { createPosition, Color } from '../../src/core/types';
 import { isInCheck, isCheckmate, getLegalMoves } from '../../src/core/rules';
 
 describe('Rules Engine', () => {

@@ -2,7 +2,6 @@
  * Chinese Chess - Main Application Component
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
 import { BoardView } from './ui/BoardView';
 import { useGameStore } from './app/game-store';
 import { getBestMove, Difficulty } from './ai/engine';

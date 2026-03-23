@@ -4,9 +4,9 @@
  * Implements Minimax with Alpha-Beta pruning and iterative deepening
  */
 
-import { Board, Color, Position, Move, PieceType } from '../core/types';
-import { getPieceAt, getPiecesByColor, findGeneral } from '../core/board';
-import { getAllLegalMovesFiltered, isInCheck, isCheckmate } from '../core/rules';
+import { Board, Color, Move, PieceType } from '../core/types';
+import { getPieceAt } from '../core/board';
+import { getAllLegalMovesFiltered, isCheckmate } from '../core/rules';
 
 // ============================================================================
 // Piece Values for Evaluation
