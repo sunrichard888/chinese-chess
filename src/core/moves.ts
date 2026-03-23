@@ -4,8 +4,8 @@
  * Implements movement rules for all 7 piece types
  */
 
-import { Board, Position, Color, PieceType, Move, Piece } from '../types';
-import { getPieceAt, getPiecesByColor, findGeneral, isValidPosition } from '../board';
+import { Board, Position, Color, PieceType, Move } from './types';
+import { getPieceAt, getPiecesByColor, findGeneral, isValidPosition } from './board';
 
 // ============================================================================
 // Helper Functions
@@ -18,7 +18,7 @@ function addPosition(pos: Position, offset: { file: number; rank: number }): Pos
   };
 }
 
-function canMoveTo(board: Board, from: Position, to: Position, color: Color): boolean {
+function canMoveTo(board: Board, _from: Position, to: Position, color: Color): boolean {
   const targetPiece = getPieceAt(board, to);
   return !targetPiece || targetPiece.color !== color;
 }
@@ -399,7 +399,7 @@ export function getAllLegalMoves(board: Board, color: Color): Move[] {
     const validMoves = getValidMoves(board, piece.position);
     for (const to of validMoves) {
       const captured = getPieceAt(board, to);
-      moves.push(createMove(piece.position, to, piece.type, captured?.type));
+      moves.push({ from: piece.position, to, piece: piece.type, captured: captured?.type });
     }
   }
 

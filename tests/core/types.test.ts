@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Color, PieceType, isValidPosition, createPosition } from '@/core/types';
+import { Color, PieceType, isValidPosition } from '../../src/core/types';
 
 describe('Domain Types', () => {
   describe('Color', () => {

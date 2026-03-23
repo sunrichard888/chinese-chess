@@ -7,8 +7,7 @@ import { BoardView } from './ui/BoardView';
 import { useGameStore } from './app/game-store';
 import { getBestMove, Difficulty } from './ai/engine';
 import { Color } from './core/types';
-import { evaluateGameStatus, isInCheck } from './core/rules';
-import { findGeneral } from './core/board';
+import { evaluateGameStatus } from './core/rules';
 
 function App() {
   const {
@@ -19,8 +18,6 @@ function App() {
     inCheck,
     difficulty,
     gameMode,
-    aiThinking,
-    aiThinkingTime,
     selectPosition,
     makeMove,
     resetGame,

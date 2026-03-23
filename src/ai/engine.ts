@@ -13,13 +13,13 @@ import { getAllLegalMovesFiltered, isInCheck, isCheckmate } from '../core/rules'
 // ============================================================================
 
 export const PIECE_VALUES: Record<PieceType, number> = {
-  General: 10000,
-  Chariot: 90,
-  Cannon: 45,
-  Horse: 40,
-  Advisor: 20,
-  Elephant: 20,
-  Soldier: 10,
+  general: 10000,
+  chariot: 90,
+  cannon: 45,
+  horse: 40,
+  advisor: 20,
+  elephant: 20,
+  soldier: 10,
 };
 
 // Position bonuses (simplified)
@@ -32,8 +32,8 @@ const RIVER_CROSSING_BONUS = 5;
 
 export function evaluateBoard(board: Board): number {
   // Checkmate first (highest priority)
-  if (isCheckmate(board, Color.Red)) return -PIECE_VALUES.General;
-  if (isCheckmate(board, Color.Black)) return PIECE_VALUES.General;
+  if (isCheckmate(board, Color.Red)) return -PIECE_VALUES.general;
+  if (isCheckmate(board, Color.Black)) return PIECE_VALUES.general;
 
   let score = 0;
 
@@ -255,8 +255,8 @@ function makeMove(board: Board, move: Move): Board {
   if (!movingPiece) return board;
 
   const newPieces = board.pieces
-    .filter(p => !(p.position.file === move.to.file && p.position.rank === move.to.rank))
-    .map(p => {
+    .filter((p) => !(p.position.file === move.to.file && p.position.rank === move.to.rank))
+    .map((p) => {
       if (p.position.file === move.from.file && p.position.rank === move.from.rank) {
         return { ...p, position: move.to };
       }

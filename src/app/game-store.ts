@@ -3,7 +3,8 @@
  */
 
 import { create } from 'zustand';
-import { GameState, GameStatus, Color, Position, Move, createInitialGameState } from '../core/board';
+import { GameState, GameStatus, createInitialGameState } from '../core/board';
+import { Color, Position, Move } from '../core/types';
 import { getLegalMoves, isInCheck, evaluateGameStatus } from '../core/rules';
 import { makeMove as makeBoardMove } from '../core/board';
 

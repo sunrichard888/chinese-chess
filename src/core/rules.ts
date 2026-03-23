@@ -60,15 +60,15 @@ export function getAllLegalMovesFiltered(board: Board, color: Color): Move[] {
     const legalMoves = getLegalMoves(board, piece.position);
     for (const to of legalMoves) {
       const captured = getPieceAt(board, to);
-      moves.push(createMove(piece.position, to, piece.type, captured?.type));
+      moves.push({ from: piece.position, to, piece: piece.type, captured: captured?.type });
     }
   }
 
   return moves;
 }
 
-function hasAnyLegalMoves(board: Board, color: Color): boolean {
-  const pieces = getPiecesByColor(board, color);
+function hasAnyLegalMoves(board: Board, _color: Color): boolean {
+  const pieces = getPiecesByColor(board, Color.Red);
   for (const piece of pieces) {
     const moves = getLegalMoves(board, piece.position);
     if (moves.length > 0) return true;
@@ -100,7 +100,7 @@ export function isStalemate(board: Board, color: Color): boolean {
 // Draw Detection
 // ============================================================================
 
-export function isDraw(board: Board, color: Color): boolean {
+export function isDraw(board: Board, _color: Color): boolean {
   // Insufficient material detection
   const redPieces = getPiecesByColor(board, Color.Red);
   const blackPieces = getPiecesByColor(board, Color.Black);
@@ -113,14 +113,14 @@ export function isDraw(board: Board, color: Color): boolean {
   // King + Advisor/Elephant vs King
   if (redPieces.length === 1 && blackPieces.length === 2) {
     const hasMinorPiece = blackPieces.some(
-      p => p.type === PieceType.Advisor || p.type === PieceType.Elephant
+      (p) => p.type === PieceType.Advisor || p.type === PieceType.Elephant
     );
     if (hasMinorPiece) return true;
   }
 
   if (blackPieces.length === 1 && redPieces.length === 2) {
     const hasMinorPiece = redPieces.some(
-      p => p.type === PieceType.Advisor || p.type === PieceType.Elephant
+      (p) => p.type === PieceType.Advisor || p.type === PieceType.Elephant
     );
     if (hasMinorPiece) return true;
   }

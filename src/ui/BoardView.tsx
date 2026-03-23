@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { Position, Piece, Color } from '../core/types';
+import { Position, Piece } from '../core/types';
 import { PieceView } from './PieceView';
 
 interface BoardViewProps {

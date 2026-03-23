@@ -4,7 +4,7 @@
  * Board: 9 files (0-8) × 10 ranks (0-9)
  */
 
-import { Piece, Position, Color, PieceType, Move, createPiece, createPosition, createMove, positionsEqual } from './types';
+import { Piece, Position, Color, PieceType, Move, createPiece, createPosition } from './types';
 
 // ============================================================================
 // Board - Current state of all pieces

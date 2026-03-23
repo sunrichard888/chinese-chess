@@ -3,7 +3,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { createInitialBoard, Color } from '../../src/core/types';
+import { Color } from '../../src/core/types';
+import { createInitialBoard } from '../../src/core/board';
 import { evaluateBoard, getBestMove, Difficulty, PIECE_VALUES } from '../../src/ai/engine';
 
 describe('AI Engine', () => {
@@ -23,13 +24,13 @@ describe('AI Engine', () => {
     });
 
     it('should correctly value pieces', () => {
-      expect(PIECE_VALUES.General).toBe(10000);
-      expect(PIECE_VALUES.Chariot).toBe(90);
-      expect(PIECE_VALUES.Cannon).toBe(45);
-      expect(PIECE_VALUES.Horse).toBe(40);
-      expect(PIECE_VALUES.Advisor).toBe(20);
-      expect(PIECE_VALUES.Elephant).toBe(20);
-      expect(PIECE_VALUES.Soldier).toBe(10);
+      expect(PIECE_VALUES.general).toBe(10000);
+      expect(PIECE_VALUES.chariot).toBe(90);
+      expect(PIECE_VALUES.cannon).toBe(45);
+      expect(PIECE_VALUES.horse).toBe(40);
+      expect(PIECE_VALUES.advisor).toBe(20);
+      expect(PIECE_VALUES.elephant).toBe(20);
+      expect(PIECE_VALUES.soldier).toBe(10);
     });
   });
 

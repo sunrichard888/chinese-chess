@@ -91,6 +91,13 @@ export function createPiece(
   return { type, color, position };
 }
 
+// Board type for AI engine
+export interface Board {
+  readonly pieces: readonly Piece[];
+  readonly turn: Color;
+  readonly moveHistory: readonly Move[];
+}
+
 export function isPiece(value: unknown): value is Piece {
   return (
     typeof value === 'object' &&
