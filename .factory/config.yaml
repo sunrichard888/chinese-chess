@@ -1,0 +1,80 @@
+# Factory Mode Configuration
+# Chinese Chess Project
+
+# Autonomy Level: conservative | balanced | autonomous
+# - conservative: Human reviews every merge, no auto-merge
+# - balanced: Full team review before push, human batch reviews
+# - autonomous: Auto-merge if all gates pass, human periodic review
+autonomy_level: balanced
+
+# Quality Gate Thresholds
+gates:
+  tests:
+    required: true
+    pass_rate: 1.0  # 100% must pass
+  
+  review:
+    required: true
+    blocking_threshold: 0  # Zero blocking issues allowed
+    non_blocking_threshold: 5  # Max non-blocking notes
+  
+  mutation:
+    required: true
+    kill_rate: 0.8  # 80% mutant kill rate
+    skip_for: ["docs", "config"]  # Directories to skip
+  
+  ci:
+    required: true
+    must_be_green: true
+  
+  accessibility:
+    required: true
+    wcag_level: "AA"
+    max_violations: 0
+
+# Rework Protocol
+rework:
+  max_cycles: 3  # Max rework attempts before escalation
+  cooldown_ms: 5000  # Wait time between rework attempts
+  
+# Escalation
+escalation:
+  on_max_rework: true  # Escalate to human after max cycles
+  on_critical_bug: true  # Escalate immediately on critical bugs
+  notify_channel: "human"  # Where to send escalation notices
+
+# Slice Processing
+slices:
+  parallel: false  # Process one slice at a time (balanced mode)
+  queue_order: "priority"  # priority | dependency | fifo
+  
+# Review Configuration
+review:
+  full_team_required: true  # All team members must review before push
+  review_timeout_minutes: 30  # Max time to wait for reviews
+  min_reviewers: 2  # Minimum reviewers (if full team not available)
+  
+# Audit Trail
+audit:
+  enabled: true
+  location: ".factory/audit-trail"
+  retain_runs: 10  # Keep last N run histories
+  
+# Project References (for pipeline context)
+project_references:
+  architecture: "docs/ARCHITECTURE.md"
+  glossary: "docs/glossary.md"
+  design_system_catalog: "docs/design-system/"
+  event_model_root: "docs/event-model/"
+
+# Notifications
+notifications:
+  on_slice_complete: true
+  on_escalation: true
+  on_retro_ready: true
+
+# Feature Flags
+features:
+  auto_merge: false  # Disabled in balanced mode
+  parallel_worktrees: false  # Disabled in balanced mode
+  speculative_execution: false  # Don't start next slice early

@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #213547;
+  background-color: #ffffff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  
+  /* Chess theme colors */
+  --chess-board-light: #F0D9B5;
+  --chess-board-dark: #B58863;
+  --chess-red: #C00;
+  --chess-black: #111;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Custom chess piece animations */
+.piece {
+  transition: transform 0.2s ease-in-out;
+}
+
+.piece:hover {
+  transform: scale(1.05);
+}
+
+/* Check indicator pulse */
+@keyframes pulse-red {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.check-indicator {
+  animation: pulse-red 1s ease-in-out infinite;
+}
+
+/* Responsive board */
+@media (max-width: 640px) {
+  .board-container {
+    padding: 1rem;
+  }
+}
