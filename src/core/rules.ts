@@ -17,7 +17,7 @@ function isSquareAttacked(board: Board, square: Position, byColor: Color): boole
 
   for (const piece of pieces) {
     const moves = getValidMoves(board, piece.position);
-    if (moves.some(m => m.file === square.file && m.rank === square.rank)) {
+    if (moves.some((m: Position) => m.file === square.file && m.rank === square.rank)) {
       return true;
     }
   }

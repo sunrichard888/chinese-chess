@@ -61,10 +61,7 @@ describe('Move Generation', () => {
 
     it('is blocked by hobbling leg', () => {
       const board = createInitialBoard();
-      const horsePos = createPosition(1, 9);
-      const moves = getHorseMoves(board, horsePos);
-      
-      // The horse at starting position should have limited moves due to blocking
+      const moves = getHorseMoves(board, createPosition(1, 9));
       expect(moves.length).toBeLessThan(8);
     });
   });
