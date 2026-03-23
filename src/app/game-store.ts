@@ -3,8 +3,10 @@
  */
 
 import { create } from 'zustand';
-import { GameState, createInitialGameState } from '../core/board';
-import { Color, Position } from '../core/types';
+import { GameState, GameStatus, createInitialGameState, makeMove as makeBoardMove } from '../core/board';
+import { Color, Position, Move } from '../core/types';
+import { getBestMove, Difficulty } from '../ai/engine';
+import { getLegalMoves, evaluateGameStatus, isInCheck } from '../core/rules';
 
 interface GameStore {
   // State
@@ -15,8 +17,6 @@ interface GameStore {
   inCheck: Position | null;
   difficulty: 'easy' | 'medium' | 'hard';
   gameMode: 'pvp' | 'pvai' | 'aivai';
-  aiThinking: boolean;
-  aiThinkingTime: number;
 
   // Actions
   selectPosition: (position: Position | null) => void;
@@ -35,8 +35,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
   inCheck: null,
   difficulty: 'medium',
   gameMode: 'pvai',
-  aiThinking: false,
-  aiThinkingTime: 0,
 
   // Actions
   selectPosition: (position) => {
@@ -49,7 +47,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
 
     const piece = state.gameState.board.pieces.find(
-      p => p.position.file === position.file && p.position.rank === position.rank
+      (p) => p.position.file === position.file && p.position.rank === position.rank
     );
 
     if (!piece) {
@@ -63,7 +61,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       // Try to capture
       if (state.selectedPosition) {
         const validMoves = getLegalMoves(state.gameState.board, state.selectedPosition);
-        const canMoveTo = validMoves.some(m => m.file === position.file && m.rank === position.rank);
+        const canMoveTo = validMoves.some((m: Position) => m.file === position.file && m.rank === position.rank);
         
         if (canMoveTo) {
           const success = get().makeMove(state.selectedPosition, position);
@@ -85,16 +83,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
   makeMove: (from, to) => {
     const state = get();
     const validMoves = getLegalMoves(state.gameState.board, from);
-    const canMoveTo = validMoves.some(m => m.file === to.file && m.rank === to.rank);
+    const canMoveTo = validMoves.some((m: Position) => m.file === to.file && m.rank === to.rank);
 
     if (!canMoveTo) {
       return false;
     }
 
     // Make the move
-    const move = { from, to, piece: state.gameState.board.pieces.find(
-      p => p.position.file === from.file && p.position.rank === from.rank
-    )?.type! };
+    const piece = state.gameState.board.pieces.find(
+      (p) => p.position.file === from.file && p.position.rank === from.rank
+    );
+    
+    if (!piece) return false;
+
+    const move: Move = { from, to, piece: piece.type };
 
     const newBoard = makeBoardMove(state.gameState.board, move);
     const gameStatus = evaluateGameStatus(newBoard);
@@ -102,7 +104,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // Check for check
     const opponentColor = newBoard.turn === Color.Red ? Color.Black : Color.Red;
     const inCheckPos = isInCheck(newBoard, opponentColor)
-      ? newBoard.pieces.find(p => p.type === 'general' && p.color === opponentColor)?.position || null
+      ? newBoard.pieces.find((p) => p.type === 'general' && p.color === opponentColor)?.position || null
       : null;
 
     set({
