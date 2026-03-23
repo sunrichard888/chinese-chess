@@ -4,8 +4,8 @@
  * Check detection, checkmate, stalemate, and legal move validation
  */
 
-import { Board, Position, Color, Move, PieceType } from '../types';
-import { getPieceAt, getPiecesByColor, findGeneral, makeMove } from '../board';
+import { Board, Position, Color, Move, PieceType } from './types';
+import { getPieceAt, getPiecesByColor, findGeneral, makeMove } from './board';
 import { getValidMoves, getAllLegalMoves } from './moves';
 
 // ============================================================================
