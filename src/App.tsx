@@ -1,4 +1,4 @@
-/**
+import React, { useState, useEffect, useCallback } from 'react';
  * Chinese Chess - Main Application Component
  */
 

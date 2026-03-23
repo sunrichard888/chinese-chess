@@ -44,7 +44,6 @@ describe('Move Generation', () => {
 
     it('cannot jump over pieces', () => {
       const board = createInitialBoard();
-      const horsePos = createPosition(1, 0); // Horse is at (1, 0)
       const moves = getChariotMoves(board, createPosition(0, 0));
       
       // Should not be able to move past the horse
