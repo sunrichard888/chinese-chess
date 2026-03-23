@@ -45,7 +45,7 @@ export function getLegalMoves(board: Board, position: Position): Position[] {
   const color = piece.color;
 
   // Filter moves that would leave own general in check
-  return pseudoLegalMoves.filter(move => {
+  return pseudoLegalMoves.filter((move: Move) => {
     const simulatedBoard = makeMove(board, createMove(position, move, piece.type));
     return !isInCheck(simulatedBoard, color);
   });
