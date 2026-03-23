@@ -7,6 +7,7 @@
 import { Board, Position, Color, Move, PieceType } from './types';
 import { getPieceAt, getPiecesByColor, findGeneral, makeMove } from './board';
 
+import { getValidMoves } from './moves';
 // ============================================================================
 // Check Detection
 // ============================================================================
@@ -46,7 +47,7 @@ export function getLegalMoves(board: Board, position: Position): Position[] {
 
   // Filter moves that would leave own general in check
   return pseudoLegalMoves.filter((move: Move) => {
-    const simulatedBoard = makeMove(board, createMove(position, move.to, piece.type));
+    const simulatedBoard = makeMove(board, createMove(position, move, piece.type));
     return !isInCheck(simulatedBoard, color);
   });
 }

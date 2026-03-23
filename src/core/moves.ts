@@ -408,3 +408,5 @@ export function getAllLegalMoves(board: Board, color: Color): Move[] {
 
 // Re-export for use in other modules
 export { getValidMoves, getAllLegalMoves };
+
+export { getValidMoves, getAllLegalMoves };
