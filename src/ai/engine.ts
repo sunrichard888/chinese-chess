@@ -7,6 +7,7 @@
 import { Board, Color, Move, PieceType } from '../core/types';
 import { getPieceAt } from '../core/board';
 import { getAllLegalMovesFiltered, isCheckmate } from '../core/rules';
+import { TranspositionTable } from './transposition-table';
 
 // ============================================================================
 // Piece Values for Evaluation
@@ -84,9 +85,22 @@ function alphaBeta(
   alpha: number,
   beta: number,
   maximizingPlayer: boolean,
-  nodeCount: { count: number }
+  nodeCount: { count: number },
+  transpositionTable?: TranspositionTable
 ): { move: Move | null; score: number } {
   nodeCount.count++;
+
+  // Try to retrieve from transposition table
+  if (transpositionTable) {
+    // Use board hash (simplified - in production would use Zobrist hashing)
+    const hash = BigInt(board.pieces.length * 1000 + depth);
+    const cached = transpositionTable.retrieve(hash);
+    
+    if (cached && cached.depth >= depth) {
+      // Use cached result if it was searched to equal or greater depth
+      return { move: cached.bestMove || null, score: cached.score };
+    }
+  }
 
   if (depth === 0) {
     return { move: null, score: evaluateBoard(board) };
@@ -103,7 +117,7 @@ function alphaBeta(
 
   for (const move of moves) {
     const newBoard = makeMove(board, move);
-    const result = alphaBeta(newBoard, depth - 1, alpha, beta, !maximizingPlayer, nodeCount);
+    const result = alphaBeta(newBoard, depth - 1, alpha, beta, !maximizingPlayer, nodeCount, transpositionTable);
 
     if (maximizingPlayer) {
       if (result.score > bestScore) {
@@ -122,18 +136,31 @@ function alphaBeta(
     }
   }
 
+  // Store result in transposition table
+  if (transpositionTable) {
+    const hash = BigInt(board.pieces.length * 1000 + depth);
+    transpositionTable.store({
+      hash,
+      depth,
+      score: bestScore,
+      bestMove: bestMove || undefined,
+      flag: 'exact' as const,
+    });
+  }
+
   return { move: bestMove, score: bestScore };
 }
 
 export function minimaxSearch(
   board: Board,
   maxDepth: number,
-  color: Color
+  color: Color,
+  transpositionTable?: TranspositionTable
 ): AISearchResult {
   const nodeCount = { count: 0 };
   const maximizingPlayer = color === Color.Red;
 
-  const result = alphaBeta(board, maxDepth, -Infinity, Infinity, maximizingPlayer, nodeCount);
+  const result = alphaBeta(board, maxDepth, -Infinity, Infinity, maximizingPlayer, nodeCount, transpositionTable);
 
   return {
     move: result.move,
@@ -151,13 +178,14 @@ export function iterativeDeepeningSearch(
   board: Board,
   maxTimeMs: number,
   color: Color,
-  maxDepth: number = 10
+  maxDepth: number = 10,
+  transpositionTable?: TranspositionTable
 ): AISearchResult {
   let bestResult: AISearchResult = { move: null, score: 0, depth: 0, nodes: 0 };
   const startTime = Date.now();
 
   for (let depth = 1; depth <= maxDepth; depth++) {
-    const result = minimaxSearch(board, depth, color);
+    const result = minimaxSearch(board, depth, color, transpositionTable);
     const elapsed = Date.now() - startTime;
 
     if (elapsed > maxTimeMs) {
@@ -213,7 +241,8 @@ export interface AIBestMove {
 export function getBestMove(
   board: Board,
   difficulty: Difficulty,
-  color: Color
+  color: Color,
+  transpositionTable?: TranspositionTable
 ): AIBestMove {
   const config = getDifficultyConfig(difficulty);
   const startTime = Date.now();
@@ -234,7 +263,7 @@ export function getBestMove(
     }
   }
 
-  const result = iterativeDeepeningSearch(board, config.maxTimeMs, color, config.maxDepth);
+  const result = iterativeDeepeningSearch(board, config.maxTimeMs, color, config.maxDepth, transpositionTable);
 
   return {
     move: result.move,
