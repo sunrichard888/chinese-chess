@@ -15,8 +15,7 @@
  * - Soldier openings (兵底炮)
  */
 
-import { Board, Move, Color } from '../core/types';
-import { getPieceAt } from '../core/board';
+import { Board, Move } from '../core/types';
 
 /**
  * Opening entry structure

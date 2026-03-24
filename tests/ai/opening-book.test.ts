@@ -4,9 +4,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { OpeningBook, OpeningEntry } from '../../src/ai/opening-book';
+import { OpeningBook } from '../../src/ai/opening-book';
 import { createInitialBoard, makeMove } from '../../src/core/board';
-import { Color } from '../../src/core/types';
 
 describe('OpeningBook', () => {
   let book: OpeningBook;

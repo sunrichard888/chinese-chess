@@ -10,17 +10,6 @@ import { getBestMove, Difficulty } from './engine';
 import { createInitialBoard } from '../core/board';
 
 /**
- * Worker request message
- */
-interface WorkerRequest {
-  type: 'find-best-move';
-  fen: string;
-  depth: number;
-  color: Color;
-  timeout?: number;
-}
-
-/**
  * Worker response message
  */
 interface WorkerResponse {
@@ -61,7 +50,7 @@ export class AIWorker {
   private pendingRequests: Map<number, {
     resolve: (response: WorkerResponse) => void;
     reject: (error: Error) => void;
-    timeout?: NodeJS.Timeout;
+    timeout?: ReturnType<typeof setTimeout>;
   }> = new Map();
 
   /**
@@ -139,7 +128,7 @@ export class AIWorker {
    */
   terminate(): void {
     // Clear pending requests
-    for (const [id, request] of this.pendingRequests.entries()) {
+    for (const request of this.pendingRequests.values()) {
       if (request.timeout) clearTimeout(request.timeout);
       request.reject(new Error('Worker terminated'));
     }
@@ -166,24 +155,24 @@ export class AIWorker {
   /**
    * Complete a pending request
    */
-  private completeRequest(id: number, response: WorkerResponse): void {
-    const request = this.pendingRequests.get(id);
+  private completeRequest(requestId: number, response: WorkerResponse): void {
+    const request = this.pendingRequests.get(requestId);
     if (request) {
       if (request.timeout) clearTimeout(request.timeout);
       request.resolve(response);
-      this.pendingRequests.delete(id);
+      this.pendingRequests.delete(requestId);
     }
   }
 
   /**
    * Fail a pending request
    */
-  private failRequest(id: number, error: Error): void {
-    const request = this.pendingRequests.get(id);
+  private failRequest(requestId: number, error: Error): void {
+    const request = this.pendingRequests.get(requestId);
     if (request) {
       if (request.timeout) clearTimeout(request.timeout);
       request.reject(error);
-      this.pendingRequests.delete(id);
+      this.pendingRequests.delete(requestId);
     }
   }
 }

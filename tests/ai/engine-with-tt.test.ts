@@ -3,7 +3,7 @@
  * Task 6.2: Integrate TT into AI search
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { getBestMove, Difficulty } from '../../src/ai/engine';
 import { createInitialBoard, makeMove } from '../../src/core/board';
 import { Color } from '../../src/core/types';

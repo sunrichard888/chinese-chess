@@ -63,7 +63,7 @@ export class TranspositionTable {
     if (this.age > 1000000) {
       this.age = 0;
       // Age all entries
-      for (const [key, value] of this.table.entries()) {
+      for (const [, value] of this.table.entries()) {
         value.age = Math.floor(value.age / 2);
       }
     }

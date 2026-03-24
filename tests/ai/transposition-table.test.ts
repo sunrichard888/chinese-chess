@@ -7,8 +7,6 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TranspositionTable, TTEntry } from '../../src/ai/transposition-table';
-import { createInitialBoard } from '../../src/core/board';
-import { Color } from '../../src/core/types';
 
 describe('TranspositionTable', () => {
   let tt: TranspositionTable;
@@ -24,8 +22,6 @@ describe('TranspositionTable', () => {
     });
 
     it('should store and retrieve entries', () => {
-      // Setup: Create a board position
-      const board = createInitialBoard();
       const hash = BigInt(12345); // Simulated hash
       const entry: TTEntry = {
         hash,
@@ -67,7 +63,6 @@ describe('TranspositionTable', () => {
         hash,
         depth: 4,
         score: 200,
-        bestMove: undefined,
         bestMove: undefined,
         flag: 'exact' as const,
       });
