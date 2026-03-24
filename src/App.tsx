@@ -65,13 +65,16 @@ function App() {
         difficulty === 'hard' ? Difficulty.Hard :
         Difficulty.Medium;
 
-      // Simulate async for UI update
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Simulate thinking time for better UX
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       const aiResult = getBestMove(gameState.board, difficultyConfig, Color.Black);
       
       if (aiResult.move) {
         makeMove(aiResult.move.from, aiResult.move.to);
+      } else {
+        // AI has no valid moves - check if checkmate or stalemate
+        console.log('AI has no valid moves - game should be over');
       }
     };
 
