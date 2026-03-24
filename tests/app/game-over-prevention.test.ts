@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { create } from 'zustand';
+
 import { useGameStore } from '../../src/app/game-store';
 import { Color } from '../../src/core/types';
 

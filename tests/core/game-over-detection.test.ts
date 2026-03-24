@@ -5,7 +5,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createInitialBoard } from '../../src/core/board';
-import { createPosition, Color } from '../../src/core/types';
+import { Color } from '../../src/core/types';
 import { 
   isInCheck, 
   isCheckmate, 
