@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import { GameState, createInitialGameState, makeMove as makeBoardMove } from '../core/board';
 import { Color, Position, Move } from '../core/types';
 import { getLegalMoves, evaluateGameStatus, isInCheck } from '../core/rules';
+import { AudioManager, loadSoundPreset } from '../audio/audio-manager';
 
 interface GameStore {
   // State
@@ -16,6 +17,7 @@ interface GameStore {
   inCheck: Position | null;
   difficulty: 'easy' | 'medium' | 'hard';
   gameMode: 'pvp' | 'pvai' | 'aivai';
+  audioManager: AudioManager | null;
 
   // Actions
   selectPosition: (position: Position | null) => void;
@@ -23,6 +25,9 @@ interface GameStore {
   resetGame: () => void;
   setDifficulty: (difficulty: 'easy' | 'medium' | 'hard') => void;
   setGameMode: (mode: 'pvp' | 'pvai' | 'aivai') => void;
+  initializeAudio: () => void;
+  setVolume: (volume: number) => void;
+  toggleMute: () => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -34,6 +39,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
   inCheck: null,
   difficulty: 'medium',
   gameMode: 'pvai',
+  audioManager: null,
+
+  // Audio Actions
+  initializeAudio: () => {
+    const audioManager = new AudioManager();
+    loadSoundPreset(audioManager, 'default');
+    set({ audioManager });
+  },
+
+  setVolume: (volume) => {
+    const state = get();
+    if (state.audioManager) {
+      state.audioManager.setVolume(volume);
+    }
+  },
+
+  toggleMute: () => {
+    const state = get();
+    if (state.audioManager) {
+      state.audioManager.toggleMute();
+    }
+  },
 
   // Actions
   selectPosition: (position) => {
@@ -95,10 +122,29 @@ export const useGameStore = create<GameStore>((set, get) => ({
     
     if (!piece) return false;
 
-    const move: Move = { from, to, piece: piece.type };
+    // Check if this is a capture move
+    const capturedPiece = state.gameState.board.pieces.find(
+      (p) => p.position.file === to.file && p.position.rank === to.rank
+    );
+
+    const move: Move = { from, to, piece: piece.type, captured: capturedPiece?.type };
 
     const newBoard = makeBoardMove(state.gameState.board, move);
     const gameStatus = evaluateGameStatus(newBoard);
+
+    // Play sound
+    if (state.audioManager) {
+      if (capturedPiece) {
+        state.audioManager.play('capture');
+      } else {
+        state.audioManager.play('move');
+      }
+      
+      // Play check sound if in check
+      if (gameStatus.status === 'check') {
+        state.audioManager.play('check');
+      }
+    }
 
     // Check for check
     const opponentColor = newBoard.turn === Color.Red ? Color.Black : Color.Red;
