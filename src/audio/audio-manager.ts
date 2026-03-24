@@ -4,9 +4,24 @@
  * Handles volume control, mute functionality, and audio playback
  */
 
-interface Sound {
+export interface Sound {
   src: string;
 }
+
+/**
+ * Sound preset type - can be a preset name or custom sound map
+ */
+export type SoundPreset = 'default' | Record<string, Sound>;
+
+/**
+ * Default sound preset paths
+ */
+const DEFAULT_SOUND_PRESET: Record<string, Sound> = {
+  move: { src: '/sounds/move.mp3' },
+  capture: { src: '/sounds/capture.mp3' },
+  check: { src: '/sounds/check.mp3' },
+  gameOver: { src: '/sounds/gameover.mp3' },
+};
 
 export class AudioManager {
   private volume: number = 0.5;
@@ -154,3 +169,30 @@ export class AudioManager {
 }
 
 export default AudioManager;
+
+/**
+ * Load a sound preset into the audio manager
+ * @param audioManager - The audio manager instance
+ * @param preset - Preset name ('default') or custom sound map
+ * @returns True if loaded successfully, false otherwise
+ */
+export function loadSoundPreset(audioManager: AudioManager, preset: SoundPreset): boolean {
+  if (preset === 'default') {
+    // Load default preset
+    Object.entries(DEFAULT_SOUND_PRESET).forEach(([key, sound]) => {
+      audioManager.loadSound(key, sound);
+    });
+    return true;
+  }
+
+  if (typeof preset === 'object' && preset !== null) {
+    // Load custom preset
+    Object.entries(preset).forEach(([key, sound]) => {
+      audioManager.loadSound(key, sound);
+    });
+    return true;
+  }
+
+  // Unknown preset
+  return false;
+}
