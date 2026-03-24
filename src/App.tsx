@@ -4,6 +4,7 @@ import { useGameStore } from './app/game-store';
 import { getBestMove, Difficulty } from './ai/engine';
 import { Color } from './core/types';
 import { evaluateGameStatus } from './core/rules';
+import { VolumeControl } from './ui/VolumeControl';
 
 function App() {
   const {
@@ -18,7 +19,14 @@ function App() {
     makeMove,
     resetGame,
     setDifficulty,
+    setGameMode,
+    initializeAudio,
   } = useGameStore();
+
+  // Initialize audio on mount
+  useEffect(() => {
+    initializeAudio();
+  }, [initializeAudio]);
 
   const [gameOver, setGameOver] = useState(false);
   const [winner, setWinner] = useState<Color | null>(null);
@@ -119,18 +127,40 @@ function App() {
             )}
           </div>
           
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
+            {/* Game Mode Selector */}
+            <select
+              value={gameMode}
+              onChange={(e) => {
+                setGameMode(e.target.value as 'pvp' | 'pvai' | 'aivai');
+                handleReset();
+              }}
+              className="px-4 py-2 border rounded-lg bg-white"
+              disabled={!gameOver && gameState.board.moveHistory.length > 0}
+              title={gameState.board.moveHistory.length > 0 ? "Finish current game to change mode" : "Select game mode"}
+            >
+              <option value="pvai">Player vs AI</option>
+              <option value="pvp">Player vs Player</option>
+              <option value="aivai">AI vs AI</option>
+            </select>
+            
+            {/* Difficulty Selector */}
             <select
               value={difficulty}
               onChange={(e) => setDifficulty(e.target.value as 'easy' | 'medium' | 'hard')}
               className="px-4 py-2 border rounded-lg"
               disabled={gameMode !== 'pvai'}
+              title={gameMode === 'pvai' ? "Select AI difficulty" : "Only available in PvAI mode"}
             >
               <option value="easy">Easy</option>
               <option value="medium">Medium</option>
               <option value="hard">Hard</option>
             </select>
             
+            {/* Volume Control */}
+            <VolumeControl />
+            
+            {/* New Game Button */}
             <button
               onClick={handleReset}
               className="px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition"
