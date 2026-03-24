@@ -18,6 +18,7 @@ interface BoardViewProps {
   onPositionSelect?: (position: Position) => void;
   className?: string;
   flipBoard?: boolean; // Flip board so Red is at bottom
+  theme?: 'classic' | 'modern' | 'green'; // Board theme
 }
 
 // Board dimensions
@@ -35,6 +36,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
   onPositionSelect,
   className = '',
   flipBoard = false,
+  theme = 'classic',
 }) => {
   const width = (FILES - 1) * CELL_SIZE + PADDING * 2;
   const height = (RANKS - 1) * CELL_SIZE + PADDING * 2;
@@ -42,6 +44,27 @@ export const BoardView: React.FC<BoardViewProps> = ({
   // River (between rank 4 and 5)
   const riverY = PADDING + 4 * CELL_SIZE;
   const riverHeight = CELL_SIZE;
+
+  // Theme colors
+  const themeColors = {
+    classic: {
+      background: 'linear-gradient(to bottom, #f59e0b 0%, #d97706 100%)',
+      grid: '#78350f',
+      river: '#fcd34d',
+    },
+    modern: {
+      background: 'linear-gradient(to bottom, #1a1a2e 0%, #16213e 100%)',
+      grid: '#e94560',
+      river: '#0f3460',
+    },
+    green: {
+      background: 'linear-gradient(to bottom, #2d5016 0%, #1a3009 100%)',
+      grid: '#4a7c23',
+      river: '#3d6b1c',
+    },
+  };
+
+  const colors = themeColors[theme];
 
   // Helper to flip rank for display
   const getDisplayRank = (rank: number): number => {
@@ -61,7 +84,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
       aria-label="Chinese Chess Board"
       className={`relative w-full max-w-2xl mx-auto aspect-[9/10] ${className}`}
       style={{
-        background: 'linear-gradient(to bottom, #f59e0b 0%, #d97706 100%)',
+        background: colors.background,
         borderRadius: '8px',
         boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
         padding: '20px',
@@ -90,7 +113,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
             y1={PADDING + i * CELL_SIZE}
             x2={PADDING + (FILES - 1) * CELL_SIZE}
             y2={PADDING + i * CELL_SIZE}
-            stroke="#78350f"
+            stroke={colors.grid}
             strokeWidth={2}
           />
         ))}
@@ -106,7 +129,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
                 y1={PADDING}
                 x2={PADDING + i * CELL_SIZE}
                 y2={PADDING + (RANKS - 1) * CELL_SIZE}
-                stroke="#78350f"
+                stroke={colors.grid}
                 strokeWidth={2}
               />
             );
@@ -119,7 +142,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
                 y1={PADDING}
                 x2={PADDING + i * CELL_SIZE}
                 y2={riverY}
-                stroke="#78350f"
+                stroke={colors.grid}
                 strokeWidth={2}
               />
               <line
@@ -127,7 +150,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
                 y1={riverY + riverHeight}
                 x2={PADDING + i * CELL_SIZE}
                 y2={PADDING + (RANKS - 1) * CELL_SIZE}
-                stroke="#78350f"
+                stroke={colors.grid}
                 strokeWidth={2}
               />
             </g>
@@ -140,7 +163,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
           y={riverY}
           width={(FILES - 1) * CELL_SIZE}
           height={riverHeight}
-          fill="#fcd34d"
+          fill={colors.river}
           opacity="0.5"
         />
 
@@ -149,7 +172,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
           x={PADDING + (FILES - 1) * CELL_SIZE / 2}
           y={riverY + CELL_SIZE / 2 + 8}
           textAnchor="middle"
-          fill="#78350f"
+          fill={colors.grid}
           fontSize="24"
           fontFamily="serif"
           style={{ letterSpacing: '20px' }}
@@ -160,7 +183,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
           x={PADDING + (FILES - 1) * CELL_SIZE / 2 + 180}
           y={riverY + CELL_SIZE / 2 + 8}
           textAnchor="middle"
-          fill="#78350f"
+          fill={colors.grid}
           fontSize="24"
           fontFamily="serif"
           style={{ letterSpacing: '20px' }}
@@ -174,7 +197,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
           y1={PADDING}
           x2={PADDING + 5 * CELL_SIZE}
           y2={PADDING + 2 * CELL_SIZE}
-          stroke="#78350f"
+          stroke={colors.grid}
           strokeWidth={2}
         />
         <line
@@ -182,7 +205,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
           y1={PADDING}
           x2={PADDING + 3 * CELL_SIZE}
           y2={PADDING + 2 * CELL_SIZE}
-          stroke="#78350f"
+          stroke={colors.grid}
           strokeWidth={2}
         />
 
@@ -192,7 +215,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
           y1={PADDING + 7 * CELL_SIZE}
           x2={PADDING + 5 * CELL_SIZE}
           y2={PADDING + 9 * CELL_SIZE}
-          stroke="#78350f"
+          stroke={colors.grid}
           strokeWidth={2}
         />
         <line
@@ -200,7 +223,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
           y1={PADDING + 7 * CELL_SIZE}
           x2={PADDING + 3 * CELL_SIZE}
           y2={PADDING + 9 * CELL_SIZE}
-          stroke="#78350f"
+          stroke={colors.grid}
           strokeWidth={2}
         />
 
@@ -322,7 +345,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
                 cx={PADDING + file * CELL_SIZE}
                 cy={PADDING + rank * CELL_SIZE}
                 r={4}
-                fill="#78350f"
+                fill={colors.grid}
                 opacity="0.6"
               />
             );

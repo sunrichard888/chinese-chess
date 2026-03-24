@@ -26,6 +26,7 @@ function App() {
   } = useGameStore();
 
   const [flipBoard, setFlipBoard] = useState(false);
+  const [boardTheme, setBoardTheme] = useState<'classic' | 'modern' | 'green'>('classic');
 
   // Initialize audio on mount
   useEffect(() => {
@@ -91,11 +92,27 @@ function App() {
 
       const aiResult = getBestMove(gameState.board, difficultyConfig, Color.Black);
       
-      if (aiResult.move) {
+      if (aiResult.move && aiResult.move.from && aiResult.move.to) {
         makeMove(aiResult.move.from, aiResult.move.to);
       } else {
-        // AI has no valid moves - check if checkmate or stalemate
-        console.log('AI has no valid moves - game should be over');
+        // AI has no valid moves - this means checkmate or stalemate
+        // Force game over detection
+        const status = evaluateGameStatus(gameState.board);
+        if (status.status === 'checkmate' || status.status === 'stalemate') {
+          setGameOver(true);
+          setWinner(status.winner || null);
+          const message = status.status === 'checkmate'
+            ? `绝杀！${status.winner === Color.Red ? '红方' : '黑方'}获胜！`
+            : '和棋！无子可动';
+          setMessage(message);
+          
+          // Announce game over
+          if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(message);
+            utterance.lang = 'zh-CN';
+            speechSynthesis.speak(utterance);
+          }
+        }
       }
     };
 
@@ -162,6 +179,18 @@ function App() {
           </div>
           
           <div className="flex gap-4 items-center">
+            {/* Board Theme Selector */}
+            <select
+              value={boardTheme}
+              onChange={(e) => setBoardTheme(e.target.value as 'classic' | 'modern' | 'green')}
+              className="px-4 py-2 border rounded-lg bg-white"
+              title="选择棋盘皮肤"
+            >
+              <option value="classic">🎨 经典木纹</option>
+              <option value="modern">⚫ 现代简约</option>
+              <option value="green">🌿 绿色棋盘</option>
+            </select>
+            
             {/* Flip Board Button */}
             <button
               onClick={() => setFlipBoard(!flipBoard)}
@@ -266,6 +295,7 @@ function App() {
             inCheck={inCheck}
             onPositionSelect={handlePositionSelect}
             flipBoard={flipBoard}
+            theme={boardTheme}
           />
         </div>
 
