@@ -25,6 +25,8 @@ function App() {
     redo,
   } = useGameStore();
 
+  const [flipBoard, setFlipBoard] = useState(false);
+
   // Initialize audio on mount
   useEffect(() => {
     initializeAudio();
@@ -133,6 +135,15 @@ function App() {
           </div>
           
           <div className="flex gap-4 items-center">
+            {/* Flip Board Button */}
+            <button
+              onClick={() => setFlipBoard(!flipBoard)}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+              title="Flip board view (翻转棋盘)"
+            >
+              🔄 Flip
+            </button>
+            
             {/* Undo/Redo Buttons */}
             <div className="flex gap-2">
               <button
@@ -224,6 +235,7 @@ function App() {
             lastMove={lastMove}
             inCheck={inCheck}
             onPositionSelect={handlePositionSelect}
+            flipBoard={flipBoard}
           />
         </div>
 

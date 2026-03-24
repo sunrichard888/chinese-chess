@@ -17,6 +17,7 @@ interface BoardViewProps {
   inCheck?: Position | null;
   onPositionSelect?: (position: Position) => void;
   className?: string;
+  flipBoard?: boolean; // Flip board so Red is at bottom
 }
 
 // Board dimensions
@@ -33,6 +34,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
   inCheck,
   onPositionSelect,
   className = '',
+  flipBoard = false,
 }) => {
   const width = (FILES - 1) * CELL_SIZE + PADDING * 2;
   const height = (RANKS - 1) * CELL_SIZE + PADDING * 2;
@@ -41,12 +43,16 @@ export const BoardView: React.FC<BoardViewProps> = ({
   const riverY = PADDING + 4 * CELL_SIZE;
   const riverHeight = CELL_SIZE;
 
-  // Note: Board is displayed with Red at top (ranks 0-4), Black at bottom (ranks 5-9)
-  // This matches the logical board representation
+  // Helper to flip rank for display
+  const getDisplayRank = (rank: number): number => {
+    return flipBoard ? (RANKS - 1 - rank) : rank;
+  };
 
   // Handle click on a board position
   const handlePositionClick = (file: number, rank: number) => {
-    onPositionSelect?.({ file, rank });
+    // Convert display rank to logical rank
+    const logicalRank = flipBoard ? (RANKS - 1 - rank) : rank;
+    onPositionSelect?.({ file, rank: logicalRank });
   };
 
   return (
@@ -313,9 +319,9 @@ export const BoardView: React.FC<BoardViewProps> = ({
           const containerWidth = width;
           const containerHeight = height;
           
-          // Position in SVG coordinates
+          // Position in SVG coordinates (with optional flip)
           const svgX = PADDING + piece.position.file * CELL_SIZE;
-          const svgY = PADDING + piece.position.rank * CELL_SIZE;
+          const svgY = PADDING + getDisplayRank(piece.position.rank) * CELL_SIZE;
           
           // Convert to percentage
           const leftPercent = (svgX / containerWidth) * 100;
