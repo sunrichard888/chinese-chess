@@ -299,35 +299,45 @@ export const BoardView: React.FC<BoardViewProps> = ({
       </svg>
 
       {/* Pieces - rendered as absolute positioned elements over the SVG */}
-      {pieces.map((piece) => {
-        const leftPercent = ((PADDING + piece.position.file * CELL_SIZE) / width) * 100;
-        const topPercent = ((PADDING + piece.position.rank * CELL_SIZE) / height) * 100;
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          padding: '20px', // Match parent padding
+        }}
+      >
+        {pieces.map((piece) => {
+          // Calculate position in SVG coordinates, then convert to percentage
+          const svgX = PADDING + piece.position.file * CELL_SIZE;
+          const svgY = PADDING + piece.position.rank * CELL_SIZE;
+          const leftPercent = (svgX / width) * 100;
+          const topPercent = (svgY / height) * 100;
 
-        return (
-          <div
-            key={`${piece.type}-${piece.color}-${piece.position.file}-${piece.position.rank}`}
-            className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110"
-            style={{
-              left: `${leftPercent}%`,
-              top: `${topPercent}%`,
-              width: `${(CELL_SIZE * 0.85 / width) * 100}%`,
-              aspectRatio: '1',
-              zIndex: 10,
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              handlePositionClick(piece.position.file, piece.position.rank);
-            }}
-          >
-            <PieceView 
-              type={piece.type} 
-              color={piece.color} 
-              size={undefined}
-              className="w-full h-full"
-            />
-          </div>
-        );
-      })}
+          return (
+            <div
+              key={`${piece.type}-${piece.color}-${piece.position.file}-${piece.position.rank}`}
+              className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110 pointer-events-auto"
+              style={{
+                left: `${leftPercent}%`,
+                top: `${topPercent}%`,
+                width: `${(CELL_SIZE * 0.85 / width) * 100}%`,
+                aspectRatio: '1',
+                zIndex: 10,
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePositionClick(piece.position.file, piece.position.rank);
+              }}
+            >
+              <PieceView 
+                type={piece.type} 
+                color={piece.color} 
+                size={undefined}
+                className="w-full h-full"
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

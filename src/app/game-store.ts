@@ -18,6 +18,10 @@ interface GameStore {
   difficulty: 'easy' | 'medium' | 'hard';
   gameMode: 'pvp' | 'pvai' | 'aivai';
   audioManager: AudioManager | null;
+  
+  // Undo/Redo state
+  history: GameState[];
+  historyPosition: number;
 
   // Actions
   selectPosition: (position: Position | null) => void;
@@ -28,6 +32,10 @@ interface GameStore {
   initializeAudio: () => void;
   setVolume: (volume: number) => void;
   toggleMute: () => void;
+  undo: () => boolean;
+  redo: () => boolean;
+  getHistoryPosition: () => number;
+  getMoveHistory: () => readonly Move[];
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -40,6 +48,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   difficulty: 'medium',
   gameMode: 'pvai',
   audioManager: null,
+  history: [],
+  historyPosition: 0,
 
   // Audio Actions
   initializeAudio: () => {
@@ -152,6 +162,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       ? newBoard.pieces.find((p) => p.type === 'general' && p.color === opponentColor)?.position || null
       : null;
 
+    // Save current state to history before making move
+    const newHistory = state.history.slice(0, state.historyPosition);
+    newHistory.push(state.gameState);
+
     set({
       gameState: {
         board: newBoard,
@@ -160,6 +174,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       },
       lastMove: { from, to },
       inCheck: inCheckPos,
+      history: newHistory,
+      historyPosition: newHistory.length,
     });
 
     return true;
@@ -172,7 +188,61 @@ export const useGameStore = create<GameStore>((set, get) => ({
       validMoves: [],
       lastMove: null,
       inCheck: null,
+      history: [],
+      historyPosition: 0,
     });
+  },
+
+  undo: () => {
+    const state = get();
+    
+    if (state.historyPosition <= 0 || state.history.length === 0) {
+      return false;
+    }
+
+    // Get previous state from history
+    const previousState = state.history[state.historyPosition - 1];
+    
+    set({
+      gameState: previousState,
+      historyPosition: state.historyPosition - 1,
+      selectedPosition: null,
+      validMoves: [],
+      lastMove: null,
+      inCheck: null,
+    });
+
+    return true;
+  },
+
+  redo: () => {
+    const state = get();
+    
+    if (state.historyPosition >= state.history.length) {
+      return false;
+    }
+
+    // Get next state from history
+    const nextState = state.history[state.historyPosition];
+    
+    set({
+      gameState: nextState,
+      historyPosition: state.historyPosition + 1,
+      selectedPosition: null,
+      validMoves: [],
+      lastMove: null,
+      inCheck: null,
+    });
+
+    return true;
+  },
+
+  getHistoryPosition: () => {
+    return get().historyPosition;
+  },
+
+  getMoveHistory: () => {
+    return get().gameState.board.moveHistory;
   },
 
   setDifficulty: (difficulty) => {
