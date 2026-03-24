@@ -36,6 +36,10 @@ interface GameStore {
   redo: () => boolean;
   getHistoryPosition: () => number;
   getMoveHistory: () => readonly Move[];
+  saveGame: (slotName: string) => boolean;
+  loadGame: (slotName: string) => boolean;
+  listSaves: () => string[];
+  deleteSave: (slotName: string) => boolean;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -243,6 +247,76 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   getMoveHistory: () => {
     return get().gameState.board.moveHistory;
+  },
+
+  saveGame: (slotName) => {
+    const state = get();
+    
+    try {
+      const saveData = {
+        gameState: state.gameState,
+        timestamp: new Date().toISOString(),
+        moveCount: state.gameState.board.moveHistory.length,
+      };
+      
+      localStorage.setItem(`chinese-chess-save-${slotName}`, JSON.stringify(saveData));
+      return true;
+    } catch (error) {
+      console.error('Failed to save game:', error);
+      return false;
+    }
+  },
+
+  loadGame: (slotName) => {
+    try {
+      const saved = localStorage.getItem(`chinese-chess-save-${slotName}`);
+      
+      if (!saved) {
+        return false;
+      }
+      
+      const saveData = JSON.parse(saved);
+      
+      set({
+        gameState: saveData.gameState,
+        history: [],
+        historyPosition: 0,
+        selectedPosition: null,
+        validMoves: [],
+        lastMove: null,
+        inCheck: null,
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to load game:', error);
+      return false;
+    }
+  },
+
+  listSaves: () => {
+    const saves: string[] = [];
+    
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('chinese-chess-save-')) {
+        const slotName = key.replace('chinese-chess-save-', '');
+        saves.push(slotName);
+      }
+    }
+    
+    return saves;
+  },
+
+  deleteSave: (slotName) => {
+    const key = `chinese-chess-save-${slotName}`;
+    
+    if (localStorage.getItem(key)) {
+      localStorage.removeItem(key);
+      return true;
+    }
+    
+    return false;
   },
 
   setDifficulty: (difficulty) => {
