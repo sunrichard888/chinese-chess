@@ -5,7 +5,7 @@
  * Tests for playing sounds on piece moves and captures
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AudioManager } from '../../src/audio/audio-manager';
 
 describe('MoveSounds', () => {

@@ -5,9 +5,8 @@
  * Tests for playing sounds during game moves via game store
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useGameStore } from '../../src/app/game-store';
-import { Color } from '../../src/core/types';
 
 describe('GameAudioIntegration', () => {
   beforeEach(() => {
