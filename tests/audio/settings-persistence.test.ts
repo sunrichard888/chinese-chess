@@ -3,7 +3,7 @@
  * Task 5.7: Settings Persistence to localStorage
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { AudioManager, loadSoundPreset, saveAudioSettings, loadAudioSettings } from '../../src/audio/audio-manager';
 
 describe('AudioSettingsPersistence', () => {
