@@ -122,6 +122,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   makeMove: (from, to) => {
     const state = get();
+    
+    // Prevent moves when game is already over (Issue #2 fix)
+    if (state.gameState.status === 'checkmate' || 
+        state.gameState.status === 'stalemate' || 
+        state.gameState.status === 'draw') {
+      console.warn('Cannot make move: game is already over');
+      return false;
+    }
+    
     const validMoves = getLegalMoves(state.gameState.board, from);
     const canMoveTo = validMoves.some((m: Position) => m.file === to.file && m.rank === to.rank);
 

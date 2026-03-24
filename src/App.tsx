@@ -82,6 +82,14 @@ function App() {
     if (gameState.board.turn !== Color.Black) return;
 
     const makeAIMove = async () => {
+      // CRITICAL: Check game status BEFORE making AI move to prevent moves after game over
+      // This fixes Issue #2 where AI would try to move even after checkmate
+      const status = evaluateGameStatus(gameState.board);
+      if (status.status === 'checkmate' || status.status === 'stalemate' || status.status === 'draw') {
+        // Game is already over, don't make any move
+        return;
+      }
+
       const difficultyConfig: Difficulty = 
         difficulty === 'easy' ? Difficulty.Easy :
         difficulty === 'hard' ? Difficulty.Hard :
