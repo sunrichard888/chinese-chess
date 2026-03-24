@@ -36,21 +36,40 @@ function App() {
   const [winner, setWinner] = useState<Color | null>(null);
   const [message, setMessage] = useState('');
 
-  // Check for game over after each move
+  // Check for game over and check status after each move
   useEffect(() => {
     const status = evaluateGameStatus(gameState.board);
+    
     if (status.status === 'checkmate' || status.status === 'stalemate' || status.status === 'draw') {
       setGameOver(true);
       setWinner(status.winner || null);
-      setMessage(
-        status.status === 'checkmate'
-          ? `Checkmate! ${status.winner === Color.Red ? 'Red' : 'Black'} wins!`
-          : status.status === 'stalemate'
-          ? 'Stalemate! Draw.'
-          : 'Draw!'
-      );
+      
+      const message = status.status === 'checkmate'
+        ? `绝杀！${status.winner === Color.Red ? '红方' : '黑方'}获胜！`
+        : status.status === 'stalemate'
+        ? '和棋！无子可动'
+        : '和棋！';
+      
+      setMessage(message);
+      
+      // Announce game over
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(message);
+        utterance.lang = 'zh-CN';
+        utterance.rate = 0.9;
+        speechSynthesis.speak(utterance);
+      }
     } else if (status.status === 'check') {
-      setMessage('Check!');
+      const checkMessage = gameState.board.turn === Color.Red ? '红方将军！' : '黑方将军！';
+      setMessage(checkMessage);
+      
+      // Announce check
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance('将军！');
+        utterance.lang = 'zh-CN';
+        utterance.rate = 1.1;
+        speechSynthesis.speak(utterance);
+      }
     } else {
       setMessage('');
     }
@@ -124,11 +143,19 @@ function App() {
           <div>
             <p className="text-lg font-semibold">
               Turn: <span className={gameState.board.turn === Color.Red ? 'text-red-600' : 'text-black'}>
-                {gameState.board.turn === Color.Red ? 'Red' : 'Black'}
+                {gameState.board.turn === Color.Red ? '🔴 红方' : '⚫ 黑方'}
               </span>
             </p>
             {message && (
-              <p className={`text-lg font-bold ${message.includes('Check') ? 'text-red-600 animate-pulse' : 'text-amber-800'}`}>
+              <p className={`text-xl font-bold mt-2 px-4 py-2 rounded-lg ${
+                message.includes('绝杀') 
+                  ? 'bg-red-600 text-white animate-bounce' 
+                  : message.includes('将军')
+                  ? 'bg-orange-500 text-white animate-pulse'
+                  : 'text-amber-800'
+              }`}>
+                {message.includes('绝杀') && '🎉 '}
+                {message.includes('将军') && '⚠️ '}
                 {message}
               </p>
             )}
@@ -210,17 +237,20 @@ function App() {
         {gameOver && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white p-8 rounded-lg shadow-xl text-center">
-              <h2 className="text-3xl font-bold mb-4">{message}</h2>
+              <h2 className="text-3xl font-bold mb-4 text-amber-900">{message}</h2>
               {winner && (
-                <p className="text-xl mb-6">
-                  {winner === Color.Red ? '🔴 Red' : '⚫ Black'} Wins!
-                </p>
+                <div className="text-2xl mb-6">
+                  <p className="mb-2">🏆 获胜者</p>
+                  <p className={winner === Color.Red ? 'text-red-600 font-bold' : 'text-black font-bold'}>
+                    {winner === Color.Red ? '🔴 红方' : '⚫ 黑方'}
+                  </p>
+                </div>
               )}
               <button
                 onClick={handleReset}
                 className="px-8 py-3 bg-amber-600 text-white text-lg rounded-lg hover:bg-amber-700 transition"
               >
-                Play Again
+                🔄 再来一局
               </button>
             </div>
           </div>

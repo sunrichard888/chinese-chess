@@ -254,16 +254,39 @@ export const BoardView: React.FC<BoardViewProps> = ({
           </>
         )}
 
-        {/* In check indicator */}
+        {/* In check indicator - pulsing red circle around general */}
         {inCheck && (
-          <circle
-            cx={PADDING + inCheck.file * CELL_SIZE}
-            cy={PADDING + inCheck.rank * CELL_SIZE}
-            r={CELL_SIZE * 0.5}
-            fill="#ef4444"
-            opacity="0.4"
-            data-testid="check-indicator"
-          />
+          <g>
+            <circle
+              cx={PADDING + inCheck.file * CELL_SIZE}
+              cy={PADDING + inCheck.rank * CELL_SIZE}
+              r={CELL_SIZE * 0.6}
+              fill="#ef4444"
+              opacity="0.3"
+              className="animate-ping"
+            />
+            <circle
+              cx={PADDING + inCheck.file * CELL_SIZE}
+              cy={PADDING + inCheck.rank * CELL_SIZE}
+              r={CELL_SIZE * 0.55}
+              fill="none"
+              stroke="#ef4444"
+              strokeWidth="3"
+              opacity="0.8"
+              className="animate-pulse"
+            />
+            <text
+              x={PADDING + inCheck.file * CELL_SIZE}
+              y={PADDING + inCheck.rank * CELL_SIZE - CELL_SIZE * 0.7}
+              textAnchor="middle"
+              fill="#ef4444"
+              fontSize="20"
+              fontWeight="bold"
+              className="animate-bounce"
+            >
+              将军！
+            </text>
+          </g>
         )}
 
         {/* Clickable intersection areas */}
