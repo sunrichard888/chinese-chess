@@ -41,10 +41,8 @@ export const BoardView: React.FC<BoardViewProps> = ({
   const riverY = PADDING + 4 * CELL_SIZE;
   const riverHeight = CELL_SIZE;
 
-  // Helper to flip rank for display (Red at bottom, Black at top)
-  const flipRank = (rank: number): number => {
-    return RANKS - 1 - rank;
-  };
+  // Note: Board is displayed with Red at top (ranks 0-4), Black at bottom (ranks 5-9)
+  // This matches the logical board representation
 
   // Handle click on a board position
   const handlePositionClick = (file: number, rank: number) => {
@@ -315,9 +313,9 @@ export const BoardView: React.FC<BoardViewProps> = ({
           const containerWidth = width;
           const containerHeight = height;
           
-          // Position in SVG coordinates (flip rank so Red is at bottom)
+          // Position in SVG coordinates
           const svgX = PADDING + piece.position.file * CELL_SIZE;
-          const svgY = PADDING + flipRank(piece.position.rank) * CELL_SIZE;
+          const svgY = PADDING + piece.position.rank * CELL_SIZE;
           
           // Convert to percentage
           const leftPercent = (svgX / containerWidth) * 100;
@@ -344,7 +342,6 @@ export const BoardView: React.FC<BoardViewProps> = ({
                 color={piece.color} 
                 size={undefined}
                 className="w-full h-full"
-                style={{ transform: piece.color === 'red' ? 'rotate(180deg)' : 'none' }}
               />
             </div>
           );
