@@ -12,6 +12,7 @@ interface PieceViewProps {
   color: Color;
   size?: number;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 // Traditional Chinese character labels
@@ -41,6 +42,7 @@ export const PieceView: React.FC<PieceViewProps> = ({
   color,
   size = 48,
   className = '',
+  style,
 }) => {
   const label = TRADITIONAL_LABELS[type][color];
   const colorClass = color === 'red' ? 'text-chess-red' : 'text-chess-black';
@@ -57,6 +59,7 @@ export const PieceView: React.FC<PieceViewProps> = ({
         height: size,
         fontSize: size * 0.6,
         lineHeight: 1,
+        ...style,
       }}
     >
       {label}

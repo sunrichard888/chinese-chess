@@ -2,10 +2,14 @@
  * Audio Manager - Core audio functionality for Chinese Chess
  * 
  * Handles volume control, mute functionality, and audio playback
+ * Uses Web Audio API for synthesized sounds (no external files needed)
  */
 
 export interface Sound {
   src: string;
+  frequency?: number;  // For synthesized sounds
+  duration?: number;   // Duration in ms
+  type?: 'sine' | 'square' | 'triangle' | 'sawtooth';
 }
 
 /**
@@ -54,6 +58,15 @@ export class AudioManager {
   private muted: boolean = false;
   private sounds: Map<string, Sound> = new Map();
   private playingSounds: Map<string, any> = new Map();
+  private audioContext: AudioContext | null = null;
+  
+  // Sound presets for synthesized audio
+  private soundPresets: Record<string, { frequency: number; duration: number; type: 'sine' | 'square' | 'triangle' | 'sawtooth' }> = {
+    'move': { frequency: 440, duration: 100, type: 'sine' },
+    'capture': { frequency: 880, duration: 150, type: 'square' },
+    'check': { frequency: 660, duration: 200, type: 'triangle' },
+    'gameOver': { frequency: 523, duration: 300, type: 'sine' },
+  };
 
   /**
    * Get current volume (0.0 - 1.0)
@@ -136,7 +149,7 @@ export class AudioManager {
   }
 
   /**
-   * Play a sound by key
+   * Play a sound by key using Web Audio API
    * @param key - Sound identifier
    * @returns True if playback started, false otherwise
    */
@@ -146,24 +159,40 @@ export class AudioManager {
       return false;
     }
 
-    const sound = this.sounds.get(key);
-    if (!sound) {
+    // Get sound preset or loaded sound
+    const preset = this.soundPresets[key];
+    if (!preset) {
       return false;
     }
 
-    // In real implementation, this would create HTML5 Audio or use Web Audio API
-    // For now, we simulate playback
-    const mockPlayback = {
-      src: sound.src,
-      volume: this.volume,
-      play: () => Promise.resolve(),
-    };
+    // Initialize AudioContext on first user interaction
+    if (!this.audioContext) {
+      try {
+        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      } catch (error) {
+        console.warn('Web Audio API not supported:', error);
+        return false;
+      }
+    }
 
-    this.playingSounds.set(key, mockPlayback);
+    // Create oscillator for synthesized sound
+    const oscillator = this.audioContext.createOscillator();
+    const gainNode = this.audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+
+    oscillator.type = preset.type;
+    oscillator.frequency.setValueAtTime(preset.frequency, this.audioContext.currentTime);
     
-    // Simulate async playback
-    mockPlayback.play().catch(console.error);
-    
+    // Apply volume
+    gainNode.gain.setValueAtTime(this.volume * 0.3, this.audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + preset.duration / 1000);
+
+    // Play sound
+    oscillator.start(this.audioContext.currentTime);
+    oscillator.stop(this.audioContext.currentTime + preset.duration / 1000);
+
     return true;
   }
 

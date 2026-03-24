@@ -41,6 +41,11 @@ export const BoardView: React.FC<BoardViewProps> = ({
   const riverY = PADDING + 4 * CELL_SIZE;
   const riverHeight = CELL_SIZE;
 
+  // Helper to flip rank for display (Red at bottom, Black at top)
+  const flipRank = (rank: number): number => {
+    return RANKS - 1 - rank;
+  };
+
   // Handle click on a board position
   const handlePositionClick = (file: number, rank: number) => {
     onPositionSelect?.({ file, rank });
@@ -306,11 +311,17 @@ export const BoardView: React.FC<BoardViewProps> = ({
         }}
       >
         {pieces.map((piece) => {
-          // Calculate position in SVG coordinates, then convert to percentage
+          // Calculate exact pixel position within the container
+          const containerWidth = width;
+          const containerHeight = height;
+          
+          // Position in SVG coordinates (flip rank so Red is at bottom)
           const svgX = PADDING + piece.position.file * CELL_SIZE;
-          const svgY = PADDING + piece.position.rank * CELL_SIZE;
-          const leftPercent = (svgX / width) * 100;
-          const topPercent = (svgY / height) * 100;
+          const svgY = PADDING + flipRank(piece.position.rank) * CELL_SIZE;
+          
+          // Convert to percentage
+          const leftPercent = (svgX / containerWidth) * 100;
+          const topPercent = (svgY / containerHeight) * 100;
 
           return (
             <div
@@ -319,7 +330,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
               style={{
                 left: `${leftPercent}%`,
                 top: `${topPercent}%`,
-                width: `${(CELL_SIZE * 0.85 / width) * 100}%`,
+                width: '8%',
                 aspectRatio: '1',
                 zIndex: 10,
               }}
@@ -333,6 +344,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
                 color={piece.color} 
                 size={undefined}
                 className="w-full h-full"
+                style={{ transform: piece.color === 'red' ? 'rotate(180deg)' : 'none' }}
               />
             </div>
           );

@@ -21,6 +21,8 @@ function App() {
     setDifficulty,
     setGameMode,
     initializeAudio,
+    undo,
+    redo,
   } = useGameStore();
 
   // Initialize audio on mount
@@ -128,6 +130,26 @@ function App() {
           </div>
           
           <div className="flex gap-4 items-center">
+            {/* Undo/Redo Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => undo()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                disabled={gameOver}
+                title="Undo last move (悔棋)"
+              >
+                ↶ Undo
+              </button>
+              <button
+                onClick={() => redo()}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                disabled={gameOver}
+                title="Redo last undone move (重做)"
+              >
+                ↷ Redo
+              </button>
+            </div>
+            
             {/* Game Mode Selector */}
             <select
               value={gameMode}
