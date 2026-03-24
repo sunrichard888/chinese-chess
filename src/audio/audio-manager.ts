@@ -196,6 +196,57 @@ export class AudioManager {
 export default AudioManager;
 
 /**
+ * Audio settings interface for persistence
+ */
+export interface AudioSettings {
+  volume: number;
+  muted: boolean;
+  theme: string;
+}
+
+const STORAGE_KEY = 'chinese-chess-audio';
+
+/**
+ * Save audio settings to localStorage
+ * @param audioManager - The audio manager instance
+ * @param theme - Current theme name
+ */
+export function saveAudioSettings(audioManager: AudioManager, theme: string = 'default'): void {
+  const settings: AudioSettings = {
+    volume: audioManager.getVolume(),
+    muted: audioManager.isMuted(),
+    theme,
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+}
+
+/**
+ * Load audio settings from localStorage
+ * @param audioManager - The audio manager instance
+ * @returns True if settings were loaded, false if no settings exist
+ */
+export function loadAudioSettings(audioManager: AudioManager): boolean {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) {
+      return false;
+    }
+
+    const settings: AudioSettings = JSON.parse(saved);
+    
+    // Apply settings
+    audioManager.setVolume(settings.volume);
+    audioManager.setMute(settings.muted);
+    
+    return true;
+  } catch (error) {
+    // Corrupted data
+    console.error('Failed to load audio settings:', error);
+    return false;
+  }
+}
+
+/**
  * Load a sound preset into the audio manager
  * @param audioManager - The audio manager instance
  * @param preset - Preset name ('default', 'classic', 'modern') or custom sound map
