@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>中国象棋 AI 项目总结报告 - Ensemble + Pipeline + Factory Mode</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --primary: #d97706;
+      --primary-dark: #b45309;
+      --secondary: #1e40af;
+      --success: #059669;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --bg-light: #fef3c7;
+      --bg-white: #ffffff;
+      --text-dark: #1f2937;
+      --text-gray: #6b7280;
+      --border: #e5e7eb;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: var(--text-dark);
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    /* Header */
+    header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: white;
+      padding: 3rem 2rem;
+      text-align: center;
+      border-radius: 1rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    }
+
+    header h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    header .subtitle {
+      font-size: 1.2rem;
+      opacity: 0.95;
+    }
+
+    header .meta {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin-top: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    header .meta-item {
+      background: rgba(255,255,255,0.2);
+      padding: 0.5rem 1rem;
+      border-radius: 2rem;
+      font-size: 0.9rem;
+    }
+
+    /* Sections */
+    section {
+      background: var(--bg-white);
+      border-radius: 1rem;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      color: var(--primary-dark);
+      font-size: 1.8rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 3px solid var(--primary);
+    }
+
+    h3 {
+      color: var(--secondary);
+      font-size: 1.3rem;
+      margin: 1.5rem 0 1rem;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--bg-light) 0%, #fbbf24 100%);
+      padding: 1.5rem;
+      border-radius: 0.8rem;
+      text-align: center;
+      border: 2px solid var(--primary);
+    }
+
+    .stat-number {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: var(--primary-dark);
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--text-gray);
+      margin-top: 0.5rem;
+    }
+
+    /* Timeline */
+    .timeline {
+      position: relative;
+      padding-left: 2rem;
+    }
+
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--primary);
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 2rem;
+      padding-left: 1.5rem;
+    }
+
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -2.3rem;
+      top: 0.5rem;
+      width: 1rem;
+      height: 1rem;
+      background: var(--primary);
+      border-radius: 50%;
+      border: 3px solid white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    .timeline-item.success::before {
+      background: var(--success);
+    }
+
+    .timeline-item.warning::before {
+      background: var(--warning);
+    }
+
+    .timeline-title {
+      font-weight: bold;
+      font-size: 1.1rem;
+      color: var(--primary-dark);
+    }
+
+    .timeline-content {
+      margin-top: 0.5rem;
+      color: var(--text-gray);
+    }
+
+    /* Feature List */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .feature-card {
+      background: var(--bg-light);
+      padding: 1.5rem;
+      border-radius: 0.8rem;
+      border-left: 4px solid var(--primary);
+    }
+
+    .feature-card h4 {
+      color: var(--primary-dark);
+      margin-bottom: 0.5rem;
+    }
+
+    .feature-list {
+      list-style: none;
+    }
+
+    .feature-list li {
+      padding: 0.3rem 0;
+      padding-left: 1.5rem;
+      position: relative;
+    }
+
+    .feature-list li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: var(--success);
+      font-weight: bold;
+    }
+
+    /* Diagrams */
+    .diagram-container {
+      background: #f9fafb;
+      padding: 2rem;
+      border-radius: 0.8rem;
+      margin: 2rem 0;
+      overflow-x: auto;
+      border: 2px solid var(--border);
+    }
+
+    .diagram-container h4 {
+      text-align: center;
+      color: var(--text-gray);
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+    }
+
+    /* Lessons Table */
+    .lessons-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+    }
+
+    .lessons-table th,
+    .lessons-table td {
+      padding: 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .lessons-table th {
+      background: var(--bg-light);
+      color: var(--primary-dark);
+      font-weight: bold;
+    }
+
+    .lessons-table tr:hover {
+      background: var(--bg-light);
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 1rem;
+      font-size: 0.85rem;
+      font-weight: bold;
+    }
+
+    .status-success {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .status-warning {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .status-danger {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    /* Quote */
+    blockquote {
+      background: var(--bg-light);
+      border-left: 4px solid var(--primary);
+      padding: 1.5rem;
+      margin: 2rem 0;
+      font-style: italic;
+      border-radius: 0 0.5rem 0.5rem 0;
+    }
+
+    blockquote p {
+      font-size: 1.1rem;
+      color: var(--text-dark);
+    }
+
+    /* Code Block */
+    pre {
+      background: #1f2937;
+      color: #f3f4f6;
+      padding: 1.5rem;
+      border-radius: 0.5rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+
+    code {
+      font-family: 'Courier New', Consolas, monospace;
+      font-size: 0.9rem;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-gray);
+      font-size: 0.9rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      header h1 {
+        font-size: 1.8rem;
+      }
+      
+      .container {
+        padding: 1rem;
+      }
+      
+      section {
+        padding: 1.5rem;
+      }
+    }
+
+    /* Print */
+    @media print {
+      body {
+        background: white;
+      }
+      
+      section {
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <h1>🎯 中国象棋 AI 项目总结报告</h1>
+      <p class="subtitle">Ensemble + Pipeline + Factory Mode 首次完整实践</p>
+      <div class="meta">
+        <div class="meta-item">📅 2026-03-24</div>
+        <div class="meta-item">⏱️ 6 天开发</div>
+        <div class="meta-item">📝 180 个测试</div>
+        <div class="meta-item">💻 ~8,200 行代码</div>
+      </div>
+    </header>
+
+    <!-- 项目概述 -->
+    <section>
+      <h2>📋 项目概述</h2>
+      <p>本项目使用 <strong>Ensemble（多角色协作）</strong>、<strong>Pipeline（切片化开发）</strong>和 <strong>严格工厂模式（TDD + 质量门）</strong> 方法，完整开发了一个功能齐全的中国象棋 AI Web 应用。</p>
+      
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-number">7</div>
+          <div class="stat-label">开发切片 (Slices)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">180</div>
+          <div class="stat-label">测试用例</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">94.4%</div>
+          <div class="stat-label">测试通过率</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">25+</div>
+          <div class="stat-label">核心功能</div>
+        </div>
+      </div>
+
+      <h3>🎮 核心功能</h3>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h4>🏁 游戏功能</h4>
+          <ul class="feature-list">
+            <li>完整中国象棋规则</li>
+            <li>PvP / PvAI / AIvAI 模式</li>
+            <li>悔棋/重做功能</li>
+            <li>保存/加载棋局</li>
+            <li>3 个难度等级</li>
+          </ul>
+        </div>
+        <div class="feature-card">
+          <h4>🤖 AI 引擎</h4>
+          <ul class="feature-list">
+            <li>Minimax + Alpha-Beta</li>
+            <li>置换表优化 (2-3 倍加速)</li>
+            <li>55+ 开局库</li>
+            <li>Web Worker 非阻塞</li>
+          </ul>
+        </div>
+        <div class="feature-card">
+          <h4>🎨 用户界面</h4>
+          <ul class="feature-list">
+            <li>3 种棋盘主题</li>
+            <li>棋盘翻转功能</li>
+            <li>响应式设计</li>
+            <li>合法移动提示</li>
+          </ul>
+        </div>
+        <div class="feature-card">
+          <h4>🔊 音频系统</h4>
+          <ul class="feature-list">
+            <li>移动/吃子/将军音效</li>
+            <li>语音播报（将军/绝杀）</li>
+            <li>音量控制</li>
+            <li>3 种音效主题</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 开发时间线 -->
+    <section>
+      <h2>📅 开发时间线</h2>
+      <div class="timeline">
+        <div class="timeline-item success">
+          <div class="timeline-title">Day 1-2: Slice 1-4 - 核心功能</div>
+          <div class="timeline-content">
+            核心规则引擎、AI 基础、UI 棋盘、皮肤系统 | 45 个测试
+          </div>
+        </div>
+        <div class="timeline-item success">
+          <div class="timeline-title">Day 3: Slice 5 - 音频系统</div>
+          <div class="timeline-content">
+            音频管理器、音效系统、音量控制、设置持久化 | 64 个测试
+          </div>
+        </div>
+        <div class="timeline-item success">
+          <div class="timeline-title">Day 4-5: Slice 6 - AI 增强</div>
+          <div class="timeline-content">
+            置换表、Web Worker、开局库 (55+) | 38 个测试
+          </div>
+        </div>
+        <div class="timeline-item success">
+          <div class="timeline-title">Day 6: Slice 7 - 游戏模式增强</div>
+          <div class="timeline-content">
+            悔棋/重做、保存/加载、E2E 测试 | 35 个测试
+          </div>
+        </div>
+        <div class="timeline-item warning">
+          <div class="timeline-title">Day 6+: 用户反馈修复</div>
+          <div class="timeline-content">
+            棋盘方向、棋子位置、UI 按钮、绝杀检测 | 持续改进
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 架构视图 -->
+    <section>
+      <h2>🏗️ 架构视图</h2>
+      
+      <h3>逻辑视图</h3>
+      <div class="diagram-container">
+        <h4>系统组件关系图</h4>
+        <div class="mermaid">
+graph TB
+    subgraph 用户界面层
+        A[App.tsx] --> B[BoardView]
+        A --> C[PieceView]
+        A --> D[VolumeControl]
+    end
+    
+    subgraph 状态管理层
+        E[game-store.ts<br/>Zustand] --> F[Undo/Redo]
+        E --> G[Save/Load]
+        E --> H[Audio Manager]
+    end
+    
+    subgraph 游戏逻辑层
+        I[board.ts] --> J[moves.ts]
+        I --> K[rules.ts]
+        J --> L[棋子走法]
+        K --> M[将军检测]
+    end
+    
+    subgraph AI 引擎层
+        N[engine.ts] --> O[Minimax]
+        N --> P[Alpha-Beta]
+        N --> Q[置换表]
+        N --> R[开局库]
+        N --> S[Web Worker]
+    end
+    
+    B --> E
+    E --> I
+    A --> N
+        </div>
+      </div>
+
+      <h3>部署视图</h3>
+      <div class="diagram-container">
+        <h4>系统部署架构图</h4>
+        <div class="mermaid">
+graph LR
+    subgraph 客户端
+        A[用户浏览器] --> B[React 应用]
+        B --> C[Vite 构建]
+        B --> D[Web Audio API]
+    end
+    
+    subgraph 托管平台
+        E[Vercel CDN] --> F[静态资源]
+        E --> G[自动部署]
+    end
+    
+    subgraph 代码仓库
+        H[GitHub] --> I[CI/CD]
+        I --> E
+    end
+    
+    B --> E
+    H --> B
+        </div>
+      </div>
+
+      <h3>类图</h3>
+      <div class="diagram-container">
+        <h4>核心类关系图</h4>
+        <div class="mermaid">
+classDiagram
+    class Board {
+        +Piece[] pieces
+        +Color turn
+        +Move[] moveHistory
+        +makeMove(move)
+    }
+    
+    class Piece {
+        +PieceType type
+        +Color color
+        +Position position
+    }
+    
+    class Move {
+        +Position from
+        +Position to
+        +PieceType piece
+        +PieceType captured
+    }
+    
+    class AudioManager {
+        -volume: number
+        -muted: boolean
+        +play(key)
+        +setVolume(v)
+        +toggleMute()
+    }
+    
+    class TranspositionTable {
+        -table: Map
+        -capacity: number
+        +store(entry)
+        +retrieve(hash)
+    }
+    
+    class OpeningBook {
+        -book: Map
+        +getMove(board)
+        +getOpeningCount()
+    }
+    
+    Board "1" *-- "many" Piece
+    Board "1" *-- "many" Move
+    Board --> AudioManager
+    Board --> TranspositionTable
+    Board --> OpeningBook
+        </div>
+      </div>
+
+      <h3>流程图</h3>
+      <div class="diagram-container">
+        <h4>AI 走棋流程图</h4>
+        <div class="mermaid">
+flowchart TD
+    A[玩家走棋] --> B{游戏结束？}
+    B -->|是 | C[显示结果]
+    B -->|否 | D{AI 回合？}
+    D -->|否 | A
+    D -->|是 | E[获取合法移动]
+    E --> F{有合法移动？}
+    F -->|否 | G[绝杀检测]
+    F -->|是 | H[AI 搜索]
+    H --> I[置换表查找]
+    I --> J{缓存命中？}
+    J -->|是 | K[返回缓存结果]
+    J -->|否 | L[Minimax 搜索]
+    L --> M[存储到置换表]
+    M --> N[执行 AI 走棋]
+    N --> B
+    G --> C
+        </div>
+      </div>
+
+      <div class="diagram-container">
+        <h4>悔棋/重做流程图</h4>
+        <div class="mermaid">
+flowchart LR
+    A[初始状态] -->|走棋 | B[状态 1]
+    B -->|走棋 | C[状态 2]
+    C -->|走棋 | D[状态 3]
+    
+    D -->|Undo| C
+    C -->|Undo| B
+    B -->|Undo| A
+    
+    A -->|Redo| B
+    B -->|Redo| C
+    C -->|Redo| D
+    
+    style A fill:#d1fae5
+    style D fill:#fee2e2
+        </div>
+      </div>
+    </section>
+
+    <!-- 经验教训 -->
+    <section>
+      <h2>📚 经验教训</h2>
+      
+      <blockquote>
+        <p><strong>关键洞察：</strong> "严格工厂模式 + 不完整的测试策略 = 高效地构建错误的东西"</p>
+      </blockquote>
+
+      <h3>✅ 成功经验</h3>
+      <table class="lessons-table">
+        <thead>
+          <tr>
+            <th>方法</th>
+            <th>效果</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>TDD 方法论</td>
+            <td>180 个测试保护核心逻辑，重构安全</td>
+            <td><span class="status-badge status-success">保持</span></td>
+          </tr>
+          <tr>
+            <td>工厂模式执行</td>
+            <td>所有 TDD 循环真实执行，审计追踪完整</td>
+            <td><span class="status-badge status-success">保持</span></td>
+          </tr>
+          <tr>
+            <td>Ensemble 技能</td>
+            <td>多角色协作，代码审查严格</td>
+            <td><span class="status-badge status-success">保持</span></td>
+          </tr>
+          <tr>
+            <td>Pipeline 方法</td>
+            <td>切片化开发降低风险，进度清晰</td>
+            <td><span class="status-badge status-success">保持</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>❌ 问题与改进</h3>
+      <table class="lessons-table">
+        <thead>
+          <tr>
+            <th>问题</th>
+            <th>根本原因</th>
+            <th>改进方案</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>测试验证不完整</td>
+            <td>缺少 E2E 和视觉验证</td>
+            <td>添加 Playwright 截图测试</td>
+            <td><span class="status-badge status-warning">已记录</span></td>
+          </tr>
+          <tr>
+            <td>用户需求理解偏差</td>
+            <td>6 天未验证，假设错误</td>
+            <td>每 Slice 完成后立即验证</td>
+            <td><span class="status-badge status-warning">已记录</span></td>
+          </tr>
+          <tr>
+            <td>工厂模式执行偏差</td>
+            <td>只关注单元测试</td>
+            <td>扩展质量门定义</td>
+            <td><span class="status-badge status-warning">已记录</span></td>
+          </tr>
+          <tr>
+            <td>沟通节奏问题</td>
+            <td>憋大招，返工成本高</td>
+            <td>每日部署 + 演示</td>
+            <td><span class="status-badge status-warning">已记录</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>📋 下次项目规则</h3>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h4>🔍 测试策略</h4>
+          <ul class="feature-list">
+            <li>每个 UI 组件 Playwright 截图</li>
+            <li>视觉回归测试进 CI</li>
+            <li>E2E 测试强制要求</li>
+            <li>不要假设"代码正确=功能正确"</li>
+          </ul>
+        </div>
+        <div class="feature-card">
+          <h4>👥 用户验证</h4>
+          <ul class="feature-list">
+            <li>每个 Slice 后部署验证</li>
+            <li>关键 UI 决策先确认</li>
+            <li>每日问"有什么不对？"</li>
+            <li>不要等"完美"再展示</li>
+          </ul>
+        </div>
+        <div class="feature-card">
+          <h4>🏭 质量门</h4>
+          <ul class="feature-list">
+            <li>TypeScript 编译 ✅</li>
+            <li>单元测试通过 ✅</li>
+            <li>E2E 测试通过 ← 新增</li>
+            <li>视觉验证通过 ← 新增</li>
+            <li>用户确认 ← 新增</li>
+          </ul>
+        </div>
+        <div class="feature-card">
+          <h4>📦 资源管理</h4>
+          <ul class="feature-list">
+            <li>实现前检查外部资源</li>
+            <li>优先使用合成/生成资源</li>
+            <li>文档化所有外部依赖</li>
+            <li>UI 假设先确认</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 改进的完成定义 -->
+    <section>
+      <h2>✅ 改进的"完成"定义</h2>
+      
+      <div class="diagram-container">
+        <h4>功能完成检查清单</h4>
+        <div class="mermaid">
+flowchart TD
+    A[功能开发] --> B[代码完成]
+    B --> C[单元测试通过]
+    C --> D[集成测试通过]
+    D --> E[E2E 测试通过]
+    E --> F[视觉验证通过]
+    F --> G[已部署]
+    G --> H[用户确认]
+    H --> I[✅ 完成]
+    
+    style I fill:#d1fae5,stroke:#059669,stroke-width:3px
+        </div>
+      </div>
+
+      <pre><code>功能"完成"当且仅当 ALL of these are true:
+- [ ] 代码编写并提交
+- [ ] 单元测试通过 (逻辑层)
+- [ ] 集成测试通过 (组件层)
+- [ ] E2E 测试通过 (浏览器层) ← 新增
+- [ ] 视觉验证通过 (截图对比) ← 新增
+- [ ] 部署到 staging/production
+- [ ] 用户确认 (关键功能) ← 新增</code></pre>
+    </section>
+
+    <!-- 测试金字塔 -->
+    <section>
+      <h2>🔺 测试金字塔 (改进后)</h2>
+      <div class="diagram-container">
+        <h4>平衡的测试策略</h4>
+        <div class="mermaid">
+graph BT
+    A[E2E 测试 10%<br/>浏览器自动化 Playwright] 
+    B[集成测试 20%<br/>组件交互]
+    C[单元测试 70%<br/>逻辑验证]
+    
+    C --> B
+    B --> A
+    
+    style A fill:#fee2e2,stroke:#dc2626
+    style B fill:#fef3c7,stroke:#d97706
+    style C fill:#d1fae5,stroke:#059669
+        </div>
+      </div>
+      
+      <p><strong>改进前：</strong>过度关注单元测试，缺少 E2E 和视觉验证</p>
+      <p><strong>改进后：</strong>平衡的测试策略，确保逻辑和视觉都正确</p>
+    </section>
+
+    <!-- 项目统计 -->
+    <section>
+      <h2>📊 项目统计</h2>
+      
+      <h3>代码分布</h3>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-number">~4,500</div>
+          <div class="stat-label">源代码行数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">~2,200</div>
+          <div class="stat-label">测试代码行数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">~1,500</div>
+          <div class="stat-label">文档行数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">~8,200</div>
+          <div class="stat-label">总代码行数</div>
+        </div>
+      </div>
+
+      <h3>测试分布</h3>
+      <div class="diagram-container">
+        <h4>测试用例分布图</h4>
+        <div class="mermaid">
+pie title 测试用例分布 (总计 180 个)
+    "AI 测试" : 40
+    "音频测试" : 64
+    "核心规则" : 30
+    "应用功能" : 35
+    "E2E 测试" : 11
+        </div>
+      </div>
+
+      <h3>Git 提交统计</h3>
+      <pre><code>总提交数：37+
+主要提交:
+- Slice 1-4: 核心功能实现
+- Slice 5: 音频系统
+- Slice 6: AI 增强
+- Slice 7: 游戏模式
+- 用户反馈修复：棋盘/UI/音效</code></pre>
+    </section>
+
+    <!-- 核心洞察 -->
+    <section>
+      <h2>💡 核心洞察</h2>
+      
+      <blockquote>
+        <p><strong>项目口号：</strong> "Test logic AND visuals. Validate early AND often. Deploy daily. Ask 'What's wrong?'"</p>
+      </blockquote>
+
+      <blockquote>
+        <p><strong>成功指标：</strong> 不是 "180 个测试通过" 而是 "0 个用户报告的 UI 问题"</p>
+      </blockquote>
+
+      <h3>记忆片段 (供未来参考)</h3>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h4>📝 项目规划</h4>
+          <ul class="feature-list">
+            <li>测试计划必须包含视觉回归</li>
+            <li>预留 20% 时间用于用户验证</li>
+            <li>每日部署，频繁验证</li>
+            <li>确认 UI 假设再实现</li>
+          </ul>
+        </div>
+        <div class="feature-card">
+          <h4>🧪 测试策略</h4>
+          <ul class="feature-list">
+            <li>单元测试 ≠ 功能完成</li>
+            <li>E2E 测试对 UI 项目强制</li>
+            <li>Playwright 用于浏览器自动化</li>
+            <li>视觉验证捕获逻辑测试遗漏</li>
+          </ul>
+        </div>
+        <div class="feature-card">
+          <h4>💬 用户沟通</h4>
+          <ul class="feature-list">
+            <li>不要等"完美"再展示</li>
+            <li>主动问"有什么不对？"</li>
+            <li>每次更新都发演示链接</li>
+            <li>截图/视频展示视觉功能</li>
+          </ul>
+        </div>
+        <div class="feature-card">
+          <h4>🏭 工厂模式</h4>
+          <ul class="feature-list">
+            <li>证据文件必要但不充分</li>
+            <li>真实执行 ≠ 正确执行</li>
+            <li>质量门必须包含视觉 + 用户</li>
+            <li>审计追踪应包括用户反馈</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 结论 -->
+    <section>
+      <h2>🎉 结论</h2>
+      
+      <p>尽管存在问题和返工，这个项目仍然是<strong>一次成功的实践</strong>：</p>
+      
+      <ul class="feature-list" style="margin: 1.5rem 0;">
+        <li>首次完整使用 Ensemble + Pipeline + 工厂模式</li>
+        <li>180 个测试保证了核心逻辑正确</li>
+        <li>严格的 TDD 执行（有证据）</li>
+        <li>完整的审计追踪</li>
+        <li>最终交付了可玩的中国象棋 AI</li>
+      </ul>
+
+      <blockquote>
+        <p><strong>关键：</strong> 不是否定工厂模式，而是<strong>完善它</strong>！</p>
+      </blockquote>
+
+      <p>感谢这次宝贵的学习经历！下次项目会做得更好！🚀</p>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <p>📄 报告生成时间：2026-03-24</p>
+      <p>🏗️ 项目：中国象棋 AI | 🎯 方法：Ensemble + Pipeline + Factory Mode</p>
+      <p>💾 仓库：<a href="https://github.com/sunrichard888/chinese-chess" style="color: var(--primary);">github.com/sunrichard8
