@@ -11,7 +11,12 @@ export interface Sound {
 /**
  * Sound preset type - can be a preset name or custom sound map
  */
-export type SoundPreset = 'default' | Record<string, Sound>;
+export type SoundPreset = 'default' | 'classic' | 'modern' | Record<string, Sound>;
+
+/**
+ * Sound theme type for theme switching
+ */
+export type SoundTheme = 'default' | 'classic' | 'modern' | Record<string, Sound>;
 
 /**
  * Default sound preset paths
@@ -21,6 +26,26 @@ const DEFAULT_SOUND_PRESET: Record<string, Sound> = {
   capture: { src: '/sounds/capture.mp3' },
   check: { src: '/sounds/check.mp3' },
   gameOver: { src: '/sounds/gameover.mp3' },
+};
+
+/**
+ * Classic theme - traditional Chinese instruments
+ */
+const CLASSIC_THEME: Record<string, Sound> = {
+  move: { src: '/sounds/classic/move.mp3' },
+  capture: { src: '/sounds/classic/capture.mp3' },
+  check: { src: '/sounds/classic/check.mp3' },
+  gameOver: { src: '/sounds/classic/gameover.mp3' },
+};
+
+/**
+ * Modern theme - electronic/digital sounds
+ */
+const MODERN_THEME: Record<string, Sound> = {
+  move: { src: '/sounds/modern/move.mp3' },
+  capture: { src: '/sounds/modern/capture.mp3' },
+  check: { src: '/sounds/modern/check.mp3' },
+  gameOver: { src: '/sounds/modern/gameover.mp3' },
 };
 
 export class AudioManager {
@@ -173,26 +198,29 @@ export default AudioManager;
 /**
  * Load a sound preset into the audio manager
  * @param audioManager - The audio manager instance
- * @param preset - Preset name ('default') or custom sound map
+ * @param preset - Preset name ('default', 'classic', 'modern') or custom sound map
  * @returns True if loaded successfully, false otherwise
  */
 export function loadSoundPreset(audioManager: AudioManager, preset: SoundPreset): boolean {
+  let soundsToLoad: Record<string, Sound>;
+
   if (preset === 'default') {
-    // Load default preset
-    Object.entries(DEFAULT_SOUND_PRESET).forEach(([key, sound]) => {
-      audioManager.loadSound(key, sound);
-    });
-    return true;
+    soundsToLoad = DEFAULT_SOUND_PRESET;
+  } else if (preset === 'classic') {
+    soundsToLoad = CLASSIC_THEME;
+  } else if (preset === 'modern') {
+    soundsToLoad = MODERN_THEME;
+  } else if (typeof preset === 'object' && preset !== null) {
+    soundsToLoad = preset;
+  } else {
+    // Unknown preset
+    return false;
   }
 
-  if (typeof preset === 'object' && preset !== null) {
-    // Load custom preset
-    Object.entries(preset).forEach(([key, sound]) => {
-      audioManager.loadSound(key, sound);
-    });
-    return true;
-  }
+  // Load sounds
+  Object.entries(soundsToLoad).forEach(([key, sound]) => {
+    audioManager.loadSound(key, sound);
+  });
 
-  // Unknown preset
-  return false;
+  return true;
 }
