@@ -1,19 +1,18 @@
 /**
  * BoardView Component - Chinese Chess Board (Pure SVG) with Animations
  *
- * All elements (grid, decorations, pieces, indicators) are rendered inside
- * a single SVG so alignment is pixel-perfect at any viewport size.
- *
- * Animation system:
- * - Piece slide: CSS transition on transform for smooth movement
- * - Capture: SVG burst particle animation
- * - Check: pulsing red ring (SVG animate)
- * - Checkmate: dramatic radial shockwave + golden glow
+ * Features:
+ * - Pure SVG rendering for pixel-perfect alignment
+ * - 3D-style pieces with radial gradients and shadows
+ * - Piece slide animation with landing bounce
+ * - Capture burst particles
+ * - Full-board "将军！" / "绝杀！" announcement overlay (replaces modal)
+ * - 3D board with wood grain texture simulation
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Position, Piece, Color, PieceType } from '../core/types';
-import { easeOutCubic, ANIM_DURATION } from './animations';
+import { easeOutCubic, easeOutBack, easeInOutQuad, ANIM_DURATION, Announcement } from './animations';
 
 /* ─────────────────────────── props ─────────────────────────── */
 
@@ -25,6 +24,8 @@ interface BoardViewProps {
   inCheck?: Position | null;
   isCheckmate?: boolean;
   checkmateWinner?: 'red' | 'black' | null;
+  /** Triggered after checkmate announcement finishes */
+  onCheckmateAnimDone?: () => void;
   onPositionSelect?: (position: Position) => void;
   className?: string;
   flipBoard?: boolean;
@@ -38,70 +39,75 @@ const RANKS = 10;
 const CELL = 60;
 const PAD = 40;
 const PIECE_R = 25;
-const FONT_SIZE = 28;
+const FONT_SIZE = 26;
 
 const BOARD_W = (FILES - 1) * CELL + PAD * 2;
 const BOARD_H = (RANKS - 1) * CELL + PAD * 2;
 
-/* ─────────────────────────── themes ───────────────────────── */
+/* ─────────────────────────── themes (3D enhanced) ─────────── */
 
 interface ThemeColors {
   bg: string;
+  bgGradient: [string, string];  // top, bottom for 3D feel
   gridLine: string;
   gridLineWidth: number;
   river: string;
   riverText: string;
   pieceStroke: string;
-  pieceFillRed: string;
-  pieceFillBlack: string;
+  // 3D piece colors: [highlight, base, shadow] for radial gradient
+  pieceGradRed: [string, string, string];
+  pieceGradBlack: [string, string, string];
   pieceTextRed: string;
   pieceTextBlack: string;
   boardBorder: string;
-  cellBg: string;
+  boardShadow: string;
 }
 
 const themes: Record<string, ThemeColors> = {
   classic: {
     bg: '#F0D9B5',
+    bgGradient: ['#F5E6CC', '#D4A76A'],
     gridLine: '#5C3317',
     gridLineWidth: 1.5,
     river: '#E8C98E',
     riverText: '#5C3317',
-    pieceStroke: '#5C3317',
-    pieceFillRed: '#FFF5E6',
-    pieceFillBlack: '#FFF5E6',
-    pieceTextRed: '#CC0000',
+    pieceStroke: '#6B3A1F',
+    pieceGradRed: ['#FFF8F0', '#F5E6D0', '#C4A882'],
+    pieceGradBlack: ['#FFF8F0', '#F5E6D0', '#C4A882'],
+    pieceTextRed: '#B30000',
     pieceTextBlack: '#1A1A1A',
-    boardBorder: '#5C3317',
-    cellBg: '#DFC08A',
+    boardBorder: '#4A2810',
+    boardShadow: '#3D2010',
   },
   modern: {
     bg: '#1A1A2E',
+    bgGradient: ['#22223B', '#121220'],
     gridLine: '#E94560',
     gridLineWidth: 1.2,
     river: '#0F3460',
     riverText: '#E94560',
     pieceStroke: '#E94560',
-    pieceFillRed: '#2D2D44',
-    pieceFillBlack: '#2D2D44',
+    pieceGradRed: ['#3D2D44', '#2D1D34', '#1D0D24'],
+    pieceGradBlack: ['#3D3D54', '#2D2D44', '#1D1D34'],
     pieceTextRed: '#FF6B81',
     pieceTextBlack: '#E0E0E0',
     boardBorder: '#E94560',
-    cellBg: '#16213E',
+    boardShadow: '#0A0A18',
   },
   green: {
     bg: '#2E6B2E',
+    bgGradient: ['#3A7A3A', '#1E4E1E'],
     gridLine: '#1A3D1A',
     gridLineWidth: 1.5,
     river: '#3D8B3D',
     riverText: '#1A3D1A',
-    pieceStroke: '#1A3D1A',
-    pieceFillRed: '#E8F0E8',
-    pieceFillBlack: '#E8F0E8',
+    pieceStroke: '#2A4F2A',
+    pieceGradRed: ['#F0F8F0', '#D8E8D8', '#A0C0A0'],
+    pieceGradBlack: ['#F0F8F0', '#D8E8D8', '#A0C0A0'],
     pieceTextRed: '#CC0000',
     pieceTextBlack: '#1A1A1A',
     boardBorder: '#1A3D1A',
-    cellBg: '#4A7C23',
+    boardShadow: '#0D1F0D',
   },
 };
 
@@ -128,7 +134,7 @@ const CROSS_MARKS: Position[] = [
   { file: 1, rank: 7 }, { file: 7, rank: 7 },
 ];
 
-/* ───────────────── capture particle system ────────────────── */
+/* ───────────────── capture particle ───────────────────────── */
 
 interface CaptureParticle {
   id: number;
@@ -151,6 +157,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
   inCheck,
   isCheckmate = false,
   checkmateWinner = null,
+  onCheckmateAnimDone,
   onPositionSelect,
   className = '',
   flipBoard = false,
@@ -159,14 +166,15 @@ export const BoardView: React.FC<BoardViewProps> = ({
   const t = themes[theme] ?? themes.classic;
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // ── Animation state ──
-  // Track previous piece positions for slide animation
+  // Animation state
   const prevPiecesRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const [animatingPieces, setAnimatingPieces] = useState<Map<string, { fromX: number; fromY: number; toX: number; toY: number; progress: number }>>(new Map());
   const [captureParticles, setCaptureParticles] = useState<CaptureParticle[]>([]);
-  const [checkmateAnim, setCheckmateAnim] = useState<{ progress: number; active: boolean }>({ progress: 0, active: false });
+  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const animFrameRef = useRef<number>(0);
   const particleIdRef = useRef(0);
+  const prevCheckRef = useRef<boolean>(false);
+  const prevCheckmateRef = useRef<boolean>(false);
 
   /* ── coordinate helpers ── */
   const toX = useCallback((file: number) => PAD + file * CELL, []);
@@ -177,12 +185,64 @@ export const BoardView: React.FC<BoardViewProps> = ({
 
   const pieceIdKey = (color: string, type: string) => `${color}-${type}`;
 
-  /* ── Detect piece movements and trigger animations ── */
+  /* ── Announcement triggers ── */
+  // Check announcement
   useEffect(() => {
-    const currentPositions = new Map<string, { x: number; y: number; file: number; rank: number }>();
-    
-    // Build a map of current piece positions keyed by a stable identity
-    // We track by color+type+instance to handle multiple pieces of the same type
+    const isCheck = !!inCheck && !isCheckmate;
+    if (isCheck && !prevCheckRef.current) {
+      setAnnouncement({
+        text: '将 军',
+        subText: undefined,
+        color: '#FF2020',
+        glowColor: '#FF0000',
+        startTime: performance.now(),
+        duration: ANIM_DURATION.announcement,
+      });
+    }
+    prevCheckRef.current = isCheck;
+  }, [inCheck, isCheckmate]);
+
+  // Checkmate announcement
+  useEffect(() => {
+    if (isCheckmate && !prevCheckmateRef.current) {
+      const winnerText = checkmateWinner === 'red' ? '红方胜' : '黑方胜';
+      setAnnouncement({
+        text: '绝 杀',
+        subText: winnerText,
+        color: checkmateWinner === 'red' ? '#FF2020' : '#4488FF',
+        glowColor: checkmateWinner === 'red' ? '#FF0000' : '#2266DD',
+        startTime: performance.now(),
+        duration: ANIM_DURATION.announcement + 500, // longer for checkmate
+      });
+      // Callback after animation
+      if (onCheckmateAnimDone) {
+        setTimeout(onCheckmateAnimDone, ANIM_DURATION.announcement + 600);
+      }
+    }
+    prevCheckmateRef.current = isCheckmate;
+  }, [isCheckmate, checkmateWinner, onCheckmateAnimDone]);
+
+  // Animate announcement
+  useEffect(() => {
+    if (!announcement) return;
+    const { startTime, duration } = announcement;
+
+    const tick = () => {
+      const now = performance.now();
+      if (now - startTime >= duration) {
+        setAnnouncement(null);
+        return;
+      }
+      // Force re-render for particle-style effects
+      setAnnouncement((a) => a ? { ...a } : null);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [announcement?.startTime]);
+
+  /* ── Detect piece movements and trigger slide animations ── */
+  useEffect(() => {
+    const currentPositions = new Map<string, { x: number; y: number }>();
     const colorTypeCounts: Record<string, number> = {};
     const sortedPieces = [...pieces].sort((a, b) => {
       if (a.color !== b.color) return a.color < b.color ? -1 : 1;
@@ -195,195 +255,183 @@ export const BoardView: React.FC<BoardViewProps> = ({
       const baseKey = pieceIdKey(piece.color, piece.type);
       colorTypeCounts[baseKey] = (colorTypeCounts[baseKey] || 0) + 1;
       const stableKey = `${baseKey}-${colorTypeCounts[baseKey]}`;
-      currentPositions.set(stableKey, {
-        x: toX(piece.position.file),
-        y: toY(piece.position.rank),
-        file: piece.position.file,
-        rank: piece.position.rank,
-      });
+      currentPositions.set(stableKey, { x: toX(piece.position.file), y: toY(piece.position.rank) });
     }
 
     const prev = prevPiecesRef.current;
     const newAnims = new Map<string, { fromX: number; fromY: number; toX: number; toY: number; progress: number }>();
     let hasCaptureAt: { x: number; y: number } | null = null;
 
-    // Detect moved pieces
     if (lastMove && prev.size > 0) {
       for (const [key, curr] of currentPositions) {
         const prevPos = prev.get(key);
         if (prevPos && (prevPos.x !== curr.x || prevPos.y !== curr.y)) {
-          newAnims.set(key, {
-            fromX: prevPos.x,
-            fromY: prevPos.y,
-            toX: curr.x,
-            toY: curr.y,
-            progress: 0,
-          });
+          newAnims.set(key, { fromX: prevPos.x, fromY: prevPos.y, toX: curr.x, toY: curr.y, progress: 0 });
         }
       }
-
-      // Detect capture: a piece that was in prev but not in current
       if (prev.size > currentPositions.size) {
-        // There was a capture; show particles at the lastMove.to position
         hasCaptureAt = { x: toX(lastMove.to.file), y: toY(lastMove.to.rank) };
       }
     }
 
-    // Start move animation
     if (newAnims.size > 0) {
       setAnimatingPieces(newAnims);
       const startTime = performance.now();
       const duration = ANIM_DURATION.move;
-
       const animate = (now: number) => {
-        const elapsed = now - startTime;
-        const raw = Math.min(elapsed / duration, 1);
+        const raw = Math.min((now - startTime) / duration, 1);
         const progress = easeOutCubic(raw);
-
         setAnimatingPieces((prev) => {
           const updated = new Map(prev);
-          for (const [k, v] of updated) {
-            updated.set(k, { ...v, progress });
-          }
+          for (const [k, v] of updated) updated.set(k, { ...v, progress });
           return updated;
         });
-
-        if (raw < 1) {
-          animFrameRef.current = requestAnimationFrame(animate);
-        } else {
-          setAnimatingPieces(new Map());
-        }
+        if (raw < 1) animFrameRef.current = requestAnimationFrame(animate);
+        else setAnimatingPieces(new Map());
       };
-
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = requestAnimationFrame(animate);
     }
 
-    // Spawn capture particles
+    // Capture particles
     if (hasCaptureAt) {
       const colors = ['#EF4444', '#F97316', '#FBBF24', '#F59E0B', '#DC2626', '#FF6B6B'];
-      const newParticles: CaptureParticle[] = [];
       const now = performance.now();
-      for (let i = 0; i < 12; i++) {
-        newParticles.push({
+      const newP: CaptureParticle[] = [];
+      for (let i = 0; i < 14; i++) {
+        newP.push({
           id: particleIdRef.current++,
-          x: hasCaptureAt.x,
-          y: hasCaptureAt.y,
-          angle: (Math.PI * 2 * i) / 12 + (Math.random() - 0.5) * 0.5,
-          speed: 40 + Math.random() * 60,
-          size: 3 + Math.random() * 4,
+          x: hasCaptureAt.x, y: hasCaptureAt.y,
+          angle: (Math.PI * 2 * i) / 14 + (Math.random() - 0.5) * 0.5,
+          speed: 35 + Math.random() * 65,
+          size: 2.5 + Math.random() * 4,
           color: colors[Math.floor(Math.random() * colors.length)],
           startTime: now,
         });
       }
-      setCaptureParticles((p) => [...p, ...newParticles]);
-
-      // Animate particles
-      const captureDuration = ANIM_DURATION.capture;
-      const animateParticles = (now2: number) => {
-        setCaptureParticles((particles) => {
-          const alive = particles.filter((p) => now2 - p.startTime < captureDuration);
-          return alive;
-        });
-        if (setCaptureParticles.length > 0) {
-          // Check if any particles are still alive
-          requestAnimationFrame((t) => {
-            setCaptureParticles((particles) => {
-              const alive = particles.filter((p) => t - p.startTime < captureDuration);
-              if (alive.length > 0) requestAnimationFrame(animateParticles);
-              return alive;
-            });
+      setCaptureParticles((p) => [...p, ...newP]);
+      const animP = () => {
+        requestAnimationFrame((t2) => {
+          setCaptureParticles((ps) => {
+            const alive = ps.filter((p) => t2 - p.startTime < ANIM_DURATION.capture);
+            if (alive.length > 0) requestAnimationFrame(animP);
+            return alive;
           });
-        }
+        });
       };
-      requestAnimationFrame(animateParticles);
+      requestAnimationFrame(animP);
     }
 
-    // Save current positions for next comparison
     const nextPrev = new Map<string, { x: number; y: number }>();
-    for (const [k, v] of currentPositions) {
-      nextPrev.set(k, { x: v.x, y: v.y });
-    }
+    for (const [k, v] of currentPositions) nextPrev.set(k, { x: v.x, y: v.y });
     prevPiecesRef.current = nextPrev;
 
     return () => cancelAnimationFrame(animFrameRef.current);
   }, [pieces, lastMove, toX, toY]);
 
-  /* ── Checkmate animation ── */
-  useEffect(() => {
-    if (!isCheckmate) {
-      setCheckmateAnim({ progress: 0, active: false });
-      return;
-    }
-
-    setCheckmateAnim({ progress: 0, active: true });
-    const startTime = performance.now();
-    const duration = ANIM_DURATION.checkmate;
-
-    const animate = (now: number) => {
-      const elapsed = now - startTime;
-      const raw = Math.min(elapsed / duration, 1);
-      setCheckmateAnim({ progress: raw, active: true });
-      if (raw < 1) {
-        requestAnimationFrame(animate);
-      }
-    };
-    requestAnimationFrame(animate);
-  }, [isCheckmate]);
-
   const handleClick = (file: number, rank: number) => {
     onPositionSelect?.({ file, rank });
   };
 
-  /* ── render helpers ── */
+  /* ══════════════════ SVG Defs (3D effects) ══════════════════ */
+
+  const renderDefs = () => (
+    <defs>
+      {/* Board wood grain */}
+      <linearGradient id="board-bg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor={t.bgGradient[0]} />
+        <stop offset="100%" stopColor={t.bgGradient[1]} />
+      </linearGradient>
+
+      {/* 3D piece gradients */}
+      <radialGradient id="piece-grad-red" cx="40%" cy="35%" r="60%">
+        <stop offset="0%" stopColor={t.pieceGradRed[0]} />
+        <stop offset="60%" stopColor={t.pieceGradRed[1]} />
+        <stop offset="100%" stopColor={t.pieceGradRed[2]} />
+      </radialGradient>
+      <radialGradient id="piece-grad-black" cx="40%" cy="35%" r="60%">
+        <stop offset="0%" stopColor={t.pieceGradBlack[0]} />
+        <stop offset="60%" stopColor={t.pieceGradBlack[1]} />
+        <stop offset="100%" stopColor={t.pieceGradBlack[2]} />
+      </radialGradient>
+
+      {/* Piece bevel highlight */}
+      <radialGradient id="piece-highlight" cx="35%" cy="30%" r="50%">
+        <stop offset="0%" stopColor="white" stopOpacity="0.4" />
+        <stop offset="100%" stopColor="white" stopOpacity="0" />
+      </radialGradient>
+
+      {/* Drop shadow filter */}
+      <filter id="piece-shadow" x="-20%" y="-10%" width="140%" height="150%">
+        <feDropShadow dx="1.5" dy="3" stdDeviation="2.5" floodColor="rgba(0,0,0,0.35)" />
+      </filter>
+
+      {/* Board edge shadow */}
+      <filter id="board-shadow" x="-5%" y="-5%" width="110%" height="110%">
+        <feDropShadow dx="0" dy="4" stdDeviation="8" floodColor={t.boardShadow} floodOpacity="0.4" />
+      </filter>
+
+      {/* Glow filters for announcements */}
+      <filter id="text-glow-red" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="8" result="blur" />
+        <feFlood floodColor="#FF0000" floodOpacity="0.6" result="color" />
+        <feComposite in="color" in2="blur" operator="in" result="glow" />
+        <feMerge>
+          <feMergeNode in="glow" />
+          <feMergeNode in="glow" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+      <filter id="text-glow-blue" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="8" result="blur" />
+        <feFlood floodColor="#2266DD" floodOpacity="0.6" result="color" />
+        <feComposite in="color" in2="blur" operator="in" result="glow" />
+        <feMerge>
+          <feMergeNode in="glow" />
+          <feMergeNode in="glow" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+
+      {/* Check ring glow */}
+      <filter id="check-glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="5" result="blur" />
+        <feFlood floodColor="#FF0000" floodOpacity="0.5" result="color" />
+        <feComposite in="color" in2="blur" operator="in" result="glow" />
+        <feMerge>
+          <feMergeNode in="glow" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+    </defs>
+  );
+
+  /* ══════════════════ Board rendering ═════════════════════════ */
 
   const renderGrid = () => {
     const lines: React.ReactNode[] = [];
-
-    for (let displayRank = 0; displayRank < RANKS; displayRank++) {
-      const y = PAD + displayRank * CELL;
-      lines.push(
-        <line key={`h-${displayRank}`}
-          x1={PAD} y1={y} x2={PAD + (FILES - 1) * CELL} y2={y}
-          stroke={t.gridLine} strokeWidth={t.gridLineWidth} />
-      );
+    for (let dr = 0; dr < RANKS; dr++) {
+      const y = PAD + dr * CELL;
+      lines.push(<line key={`h-${dr}`} x1={PAD} y1={y} x2={PAD + (FILES - 1) * CELL} y2={y} stroke={t.gridLine} strokeWidth={t.gridLineWidth} />);
     }
-
-    for (let file = 0; file < FILES; file++) {
-      const x = PAD + file * CELL;
-      if (file === 0 || file === FILES - 1) {
-        lines.push(
-          <line key={`v-${file}`}
-            x1={x} y1={PAD} x2={x} y2={PAD + (RANKS - 1) * CELL}
-            stroke={t.gridLine} strokeWidth={t.gridLineWidth} />
-        );
+    for (let f = 0; f < FILES; f++) {
+      const x = PAD + f * CELL;
+      if (f === 0 || f === FILES - 1) {
+        lines.push(<line key={`v-${f}`} x1={x} y1={PAD} x2={x} y2={PAD + (RANKS - 1) * CELL} stroke={t.gridLine} strokeWidth={t.gridLineWidth} />);
       } else {
-        lines.push(
-          <line key={`vt-${file}`}
-            x1={x} y1={PAD} x2={x} y2={PAD + 4 * CELL}
-            stroke={t.gridLine} strokeWidth={t.gridLineWidth} />
-        );
-        lines.push(
-          <line key={`vb-${file}`}
-            x1={x} y1={PAD + 5 * CELL} x2={x} y2={PAD + (RANKS - 1) * CELL}
-            stroke={t.gridLine} strokeWidth={t.gridLineWidth} />
-        );
+        lines.push(<line key={`vt-${f}`} x1={x} y1={PAD} x2={x} y2={PAD + 4 * CELL} stroke={t.gridLine} strokeWidth={t.gridLineWidth} />);
+        lines.push(<line key={`vb-${f}`} x1={x} y1={PAD + 5 * CELL} x2={x} y2={PAD + (RANKS - 1) * CELL} stroke={t.gridLine} strokeWidth={t.gridLineWidth} />);
       }
     }
-
     return lines;
   };
 
   const renderPalaceDiagonals = () => (
     <>
-      <line x1={PAD + 3 * CELL} y1={PAD} x2={PAD + 5 * CELL} y2={PAD + 2 * CELL}
-            stroke={t.gridLine} strokeWidth={t.gridLineWidth} />
-      <line x1={PAD + 5 * CELL} y1={PAD} x2={PAD + 3 * CELL} y2={PAD + 2 * CELL}
-            stroke={t.gridLine} strokeWidth={t.gridLineWidth} />
-      <line x1={PAD + 3 * CELL} y1={PAD + 7 * CELL} x2={PAD + 5 * CELL} y2={PAD + 9 * CELL}
-            stroke={t.gridLine} strokeWidth={t.gridLineWidth} />
-      <line x1={PAD + 5 * CELL} y1={PAD + 7 * CELL} x2={PAD + 3 * CELL} y2={PAD + 9 * CELL}
-            stroke={t.gridLine} strokeWidth={t.gridLineWidth} />
+      <line x1={PAD + 3 * CELL} y1={PAD} x2={PAD + 5 * CELL} y2={PAD + 2 * CELL} stroke={t.gridLine} strokeWidth={t.gridLineWidth} />
+      <line x1={PAD + 5 * CELL} y1={PAD} x2={PAD + 3 * CELL} y2={PAD + 2 * CELL} stroke={t.gridLine} strokeWidth={t.gridLineWidth} />
+      <line x1={PAD + 3 * CELL} y1={PAD + 7 * CELL} x2={PAD + 5 * CELL} y2={PAD + 9 * CELL} stroke={t.gridLine} strokeWidth={t.gridLineWidth} />
+      <line x1={PAD + 5 * CELL} y1={PAD + 7 * CELL} x2={PAD + 3 * CELL} y2={PAD + 9 * CELL} stroke={t.gridLine} strokeWidth={t.gridLineWidth} />
     </>
   );
 
@@ -394,221 +442,107 @@ export const BoardView: React.FC<BoardViewProps> = ({
     const bottomText = flipBoard ? '楚　　河' : '漢　　界';
     return (
       <>
-        <rect x={PAD} y={y} width={(FILES - 1) * CELL} height={h}
-              fill={t.river} opacity={0.5} />
-        <text x={PAD + (FILES - 1) * CELL * 0.25} y={y + h / 2 + 8}
-              textAnchor="middle" fill={t.riverText}
-              fontSize={20} fontFamily="KaiTi, STKaiti, serif"
-              fontWeight="bold" letterSpacing={6}>{topText}</text>
-        <text x={PAD + (FILES - 1) * CELL * 0.75} y={y + h / 2 + 8}
-              textAnchor="middle" fill={t.riverText}
-              fontSize={20} fontFamily="KaiTi, STKaiti, serif"
-              fontWeight="bold" letterSpacing={6}>{bottomText}</text>
+        <rect x={PAD} y={y} width={(FILES - 1) * CELL} height={h} fill={t.river} opacity={0.5} />
+        <text x={PAD + (FILES - 1) * CELL * 0.25} y={y + h / 2 + 8} textAnchor="middle" fill={t.riverText}
+          fontSize={20} fontFamily="KaiTi, STKaiti, serif" fontWeight="bold" letterSpacing={6}>{topText}</text>
+        <text x={PAD + (FILES - 1) * CELL * 0.75} y={y + h / 2 + 8} textAnchor="middle" fill={t.riverText}
+          fontSize={20} fontFamily="KaiTi, STKaiti, serif" fontWeight="bold" letterSpacing={6}>{bottomText}</text>
       </>
     );
   };
 
   const renderCrossMarks = () => {
-    const arm = 6;
-    const gap = 4;
+    const arm = 6, gap = 4;
     const elems: React.ReactNode[] = [];
-
     CROSS_MARKS.forEach((pos) => {
-      const cx = toX(pos.file);
-      const cy = toY(pos.rank);
+      const cx = toX(pos.file), cy = toY(pos.rank);
       const key = `cross-${pos.file}-${pos.rank}`;
-
       const arms: [number, number][] = [];
       if (pos.file > 0) arms.push([-1, -1], [-1, 1]);
       if (pos.file < 8) arms.push([1, -1], [1, 1]);
-
       arms.forEach(([dx, dy], i) => {
-        elems.push(
-          <line key={`${key}-h-${i}`}
-            x1={cx + dx * gap} y1={cy + dy * gap}
-            x2={cx + dx * (gap + arm)} y2={cy + dy * gap}
-            stroke={t.gridLine} strokeWidth={1} />
-        );
-        elems.push(
-          <line key={`${key}-v-${i}`}
-            x1={cx + dx * gap} y1={cy + dy * gap}
-            x2={cx + dx * gap} y2={cy + dy * (gap + arm)}
-            stroke={t.gridLine} strokeWidth={1} />
-        );
+        elems.push(<line key={`${key}-h-${i}`} x1={cx + dx * gap} y1={cy + dy * gap} x2={cx + dx * (gap + arm)} y2={cy + dy * gap} stroke={t.gridLine} strokeWidth={1} />);
+        elems.push(<line key={`${key}-v-${i}`} x1={cx + dx * gap} y1={cy + dy * gap} x2={cx + dx * gap} y2={cy + dy * (gap + arm)} stroke={t.gridLine} strokeWidth={1} />);
       });
     });
-
     return elems;
   };
 
   const renderLastMoveHighlight = () => {
     if (!lastMove) return null;
-    return (
-      <>
-        {[lastMove.from, lastMove.to].map((pos, i) => {
-          const cx = toX(pos.file);
-          const cy = toY(pos.rank);
-          const size = CELL * 0.8;
-          return (
-            <rect key={`lm-${i}`}
-              x={cx - size / 2} y={cy - size / 2}
-              width={size} height={size}
-              rx={4} ry={4} fill="#3B82F6" opacity={0.25} />
-          );
-        })}
-      </>
-    );
+    return <>{[lastMove.from, lastMove.to].map((pos, i) => {
+      const cx = toX(pos.file), cy = toY(pos.rank), size = CELL * 0.8;
+      return <rect key={`lm-${i}`} x={cx - size / 2} y={cy - size / 2} width={size} height={size} rx={4} ry={4} fill="#3B82F6" opacity={0.25} />;
+    })}</>;
   };
 
   const renderSelectedHighlight = () => {
     if (!selectedPosition) return null;
-    const cx = toX(selectedPosition.file);
-    const cy = toY(selectedPosition.rank);
-    const size = CELL * 0.85;
+    const cx = toX(selectedPosition.file), cy = toY(selectedPosition.rank), size = CELL * 0.85;
     return (
       <>
-        {/* Pulsing glow behind selection */}
         <circle cx={cx} cy={cy} r={PIECE_R + 8} fill="#22C55E" opacity={0.15}>
-          <animate attributeName="r" values={`${PIECE_R + 6};${PIECE_R + 12};${PIECE_R + 6}`}
-            dur="0.8s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="0.15;0.08;0.15"
-            dur="0.8s" repeatCount="indefinite" />
+          <animate attributeName="r" values={`${PIECE_R + 6};${PIECE_R + 12};${PIECE_R + 6}`} dur="0.8s" repeatCount="indefinite" />
         </circle>
-        <rect x={cx - size / 2} y={cy - size / 2}
-          width={size} height={size}
-          rx={4} ry={4} fill="#22C55E" opacity={0.35}
-          data-testid="selected-position" />
+        <rect x={cx - size / 2} y={cy - size / 2} width={size} height={size} rx={4} ry={4} fill="#22C55E" opacity={0.35} data-testid="selected-position" />
       </>
     );
   };
 
-  const renderValidMoves = () =>
-    validMoves.map((pos, i) => {
-      const cx = toX(pos.file);
-      const cy = toY(pos.rank);
-      const isCapture = pieces.some(
-        (p) => p.position.file === pos.file && p.position.rank === pos.rank
-      );
-      if (isCapture) {
-        return (
-          <g key={`vm-${i}`}>
-            <circle cx={cx} cy={cy} r={PIECE_R + 2}
-              fill="none" stroke="#EF4444" strokeWidth={3} opacity={0.7}
-              data-testid="valid-move-indicator">
-              <animate attributeName="strokeWidth" values="2;4;2"
-                dur="1s" repeatCount="indefinite" />
-            </circle>
-          </g>
-        );
-      }
+  const renderValidMoves = () => validMoves.map((pos, i) => {
+    const cx = toX(pos.file), cy = toY(pos.rank);
+    const isCapture = pieces.some((p) => p.position.file === pos.file && p.position.rank === pos.rank);
+    if (isCapture) {
       return (
-        <circle key={`vm-${i}`}
-          cx={cx} cy={cy} r={7}
-          fill="#22C55E" opacity={0.7}
-          data-testid="valid-move-indicator">
-          <animate attributeName="r" values="5;8;5" dur="1.2s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="0.7;0.4;0.7" dur="1.2s" repeatCount="indefinite" />
+        <circle key={`vm-${i}`} cx={cx} cy={cy} r={PIECE_R + 2} fill="none" stroke="#EF4444" strokeWidth={3} opacity={0.7} data-testid="valid-move-indicator">
+          <animate attributeName="strokeWidth" values="2;4;2" dur="1s" repeatCount="indefinite" />
         </circle>
       );
-    });
+    }
+    return (
+      <circle key={`vm-${i}`} cx={cx} cy={cy} r={7} fill="#22C55E" opacity={0.7} data-testid="valid-move-indicator">
+        <animate attributeName="r" values="5;8;5" dur="1.2s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.7;0.4;0.7" dur="1.2s" repeatCount="indefinite" />
+      </circle>
+    );
+  });
 
+  /* ── Check indicator (ring only, no text — text is in announcement overlay) ── */
   const renderCheckIndicator = () => {
     if (!inCheck) return null;
-    const cx = toX(inCheck.file);
-    const cy = toY(inCheck.rank);
+    const cx = toX(inCheck.file), cy = toY(inCheck.rank);
     return (
-      <g>
-        {/* Outer pulsing ring */}
-        <circle cx={cx} cy={cy} r={PIECE_R + 6}
-          fill="none" stroke="#EF4444" strokeWidth={3} opacity={0.8}>
-          <animate attributeName="r" values={`${PIECE_R + 4};${PIECE_R + 14};${PIECE_R + 4}`}
-            dur="0.8s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="0.9;0.2;0.9"
-            dur="0.8s" repeatCount="indefinite" />
+      <g filter="url(#check-glow)">
+        <circle cx={cx} cy={cy} r={PIECE_R + 6} fill="none" stroke="#EF4444" strokeWidth={3} opacity={0.9}>
+          <animate attributeName="r" values={`${PIECE_R + 4};${PIECE_R + 14};${PIECE_R + 4}`} dur="0.8s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0.9;0.3;0.9" dur="0.8s" repeatCount="indefinite" />
         </circle>
-        {/* Inner red glow */}
-        <circle cx={cx} cy={cy} r={PIECE_R + 2}
-          fill="#EF4444" opacity={0.15}>
-          <animate attributeName="opacity" values="0.15;0.3;0.15"
-            dur="0.6s" repeatCount="indefinite" />
+        <circle cx={cx} cy={cy} r={PIECE_R + 2} fill="#EF4444" opacity={0.12}>
+          <animate attributeName="opacity" values="0.12;0.25;0.12" dur="0.6s" repeatCount="indefinite" />
         </circle>
-        {/* "将军" text above */}
-        <text x={cx} y={cy - PIECE_R - 12}
-          textAnchor="middle" fill="#EF4444"
-          fontSize={16} fontWeight="bold"
-          fontFamily="KaiTi, STKaiti, serif">
-          <animate attributeName="opacity" values="1;0.5;1"
-            dur="0.8s" repeatCount="indefinite" />
-          将军！
-        </text>
       </g>
     );
   };
 
-  /* ── Capture particles rendering ── */
+  /* ── Capture particles ── */
   const renderCaptureParticles = () => {
     if (captureParticles.length === 0) return null;
     const now = performance.now();
-    return (
-      <g>
-        {captureParticles.map((p) => {
-          const elapsed = now - p.startTime;
-          const progress = Math.min(elapsed / ANIM_DURATION.capture, 1);
-          const eased = easeOutCubic(progress);
-          const px = p.x + Math.cos(p.angle) * p.speed * eased;
-          const py = p.y + Math.sin(p.angle) * p.speed * eased;
-          const opacity = 1 - progress;
-          const size = p.size * (1 - progress * 0.5);
-          return (
-            <circle key={p.id}
-              cx={px} cy={py} r={size}
-              fill={p.color} opacity={opacity} />
-          );
-        })}
-      </g>
-    );
+    return <g>{captureParticles.map((p) => {
+      const elapsed = now - p.startTime;
+      const progress = Math.min(elapsed / ANIM_DURATION.capture, 1);
+      const eased = easeOutCubic(progress);
+      return <circle key={p.id}
+        cx={p.x + Math.cos(p.angle) * p.speed * eased}
+        cy={p.y + Math.sin(p.angle) * p.speed * eased}
+        r={p.size * (1 - progress * 0.5)}
+        fill={p.color} opacity={1 - progress} />;
+    })}</g>;
   };
 
-  /* ── Checkmate overlay ── */
-  const renderCheckmateOverlay = () => {
-    if (!checkmateAnim.active) return null;
-    const { progress } = checkmateAnim;
-    const centerX = BOARD_W / 2;
-    const centerY = BOARD_H / 2;
-    const maxRadius = Math.max(BOARD_W, BOARD_H);
-    const waveRadius = maxRadius * easeOutCubic(progress);
-    const waveOpacity = 0.3 * (1 - progress);
-    const glowColor = checkmateWinner === 'red' ? '#EF4444' : '#3B82F6';
+  /* ══════════════════ 3D Pieces ══════════════════════════════ */
 
-    return (
-      <g>
-        {/* Shockwave ring */}
-        <circle cx={centerX} cy={centerY} r={waveRadius}
-          fill="none" stroke={glowColor} strokeWidth={4}
-          opacity={waveOpacity} />
-        {/* Inner glow */}
-        <circle cx={centerX} cy={centerY} r={waveRadius * 0.6}
-          fill={glowColor} opacity={waveOpacity * 0.3} />
-        {/* Radial lines */}
-        {progress > 0.2 && Array.from({ length: 8 }, (_, i) => {
-          const angle = (Math.PI * 2 * i) / 8;
-          const len = waveRadius * 0.8;
-          return (
-            <line key={`ray-${i}`}
-              x1={centerX} y1={centerY}
-              x2={centerX + Math.cos(angle) * len}
-              y2={centerY + Math.sin(angle) * len}
-              stroke={glowColor} strokeWidth={2}
-              opacity={waveOpacity * 0.5} />
-          );
-        })}
-      </g>
-    );
-  };
-
-  /* ── Pieces with animation ── */
   const renderPieces = () => {
-    // Build stable keys matching the animation tracking
     const colorTypeCounts: Record<string, number> = {};
     const sortedPieces = [...pieces].sort((a, b) => {
       if (a.color !== b.color) return a.color < b.color ? -1 : 1;
@@ -625,7 +559,6 @@ export const BoardView: React.FC<BoardViewProps> = ({
       let cx = toX(piece.position.file);
       let cy = toY(piece.position.rank);
 
-      // Apply slide animation if active
       const anim = animatingPieces.get(stableKey);
       if (anim) {
         cx = anim.fromX + (anim.toX - anim.fromX) * anim.progress;
@@ -634,38 +567,33 @@ export const BoardView: React.FC<BoardViewProps> = ({
 
       const label = PIECE_LABELS[piece.type][piece.color];
       const isRed = piece.color === Color.Red;
+      const gradId = isRed ? 'piece-grad-red' : 'piece-grad-black';
 
-      // Landing bounce: scale up slightly at end of animation
-      let scaleTransform = '';
+      // Landing bounce scale
+      let scaleStr = '';
       if (anim && anim.progress > 0.8) {
-        const bounceProgress = (anim.progress - 0.8) / 0.2;
-        const scale = 1 + 0.08 * Math.sin(bounceProgress * Math.PI);
-        scaleTransform = ` scale(${scale})`;
+        const bp = (anim.progress - 0.8) / 0.2;
+        const s = 1 + 0.1 * Math.sin(bp * Math.PI);
+        scaleStr = ` scale(${s})`;
       }
 
       return (
-        <g key={stableKey}
-           transform={`translate(${cx}, ${cy})${scaleTransform}`}
-           style={{ cursor: 'pointer' }}>
-          {/* Drop shadow */}
-          <circle cx={1} cy={2} r={PIECE_R} fill="rgba(0,0,0,0.15)" />
-          {/* Piece body */}
-          <circle cx={0} cy={0} r={PIECE_R}
-            fill={isRed ? t.pieceFillRed : t.pieceFillBlack}
-            stroke={t.pieceStroke} strokeWidth={2} />
-          {/* Inner ring */}
-          <circle cx={0} cy={0} r={PIECE_R - 4}
-            fill="none"
-            stroke={isRed ? t.pieceTextRed : t.pieceTextBlack}
-            strokeWidth={1} opacity={0.5} />
-          {/* Character */}
-          <text x={0} y={FONT_SIZE * 0.35}
-            textAnchor="middle"
+        <g key={stableKey} transform={`translate(${cx}, ${cy})${scaleStr}`} style={{ cursor: 'pointer' }} filter="url(#piece-shadow)">
+          {/* 3D base (dark bottom edge) */}
+          <ellipse cx={0} cy={3} rx={PIECE_R} ry={PIECE_R * 0.85} fill={t.pieceStroke} opacity={0.5} />
+          {/* Main body with gradient */}
+          <circle cx={0} cy={0} r={PIECE_R} fill={`url(#${gradId})`} stroke={t.pieceStroke} strokeWidth={1.5} />
+          {/* Highlight overlay for 3D convexity */}
+          <circle cx={0} cy={0} r={PIECE_R} fill="url(#piece-highlight)" />
+          {/* Rim / inner ring with 3D inset look */}
+          <circle cx={0} cy={-0.5} r={PIECE_R - 4} fill="none"
+            stroke={isRed ? t.pieceTextRed : t.pieceTextBlack} strokeWidth={0.8} opacity={0.4} />
+          {/* Character with slight text shadow */}
+          <text x={0} y={FONT_SIZE * 0.35 - 0.5} textAnchor="middle"
             fill={isRed ? t.pieceTextRed : t.pieceTextBlack}
-            fontSize={FONT_SIZE}
-            fontFamily="KaiTi, STKaiti, SimSun, serif"
-            fontWeight="bold"
-            style={{ userSelect: 'none' }}>
+            fontSize={FONT_SIZE} fontFamily="KaiTi, STKaiti, SimSun, serif" fontWeight="bold"
+            style={{ userSelect: 'none' }}
+            stroke={isRed ? 'rgba(180,0,0,0.15)' : 'rgba(0,0,0,0.1)'} strokeWidth={0.5}>
             {label}
           </text>
         </g>
@@ -673,18 +601,95 @@ export const BoardView: React.FC<BoardViewProps> = ({
     });
   };
 
+  /* ══════════════════ Announcement overlay ════════════════════ */
+
+  const renderAnnouncement = () => {
+    if (!announcement) return null;
+
+    const now = performance.now();
+    const elapsed = now - announcement.startTime;
+    const { duration, text, subText, color, glowColor } = announcement;
+
+    // Phase calculation
+    const fadeInEnd = ANIM_DURATION.announceFadeIn;
+    const holdEnd = fadeInEnd + ANIM_DURATION.announceHold;
+    const fadeOutEnd = duration;
+
+    let opacity = 0;
+    let scale = 0.3;
+
+    if (elapsed < fadeInEnd) {
+      // Fade in with scale up
+      const p = elapsed / fadeInEnd;
+      const ep = easeOutBack(p);
+      opacity = p;
+      scale = 0.3 + 0.7 * ep;
+    } else if (elapsed < holdEnd) {
+      // Hold
+      opacity = 1;
+      scale = 1;
+    } else if (elapsed < fadeOutEnd) {
+      // Fade out with scale up
+      const p = (elapsed - holdEnd) / (fadeOutEnd - holdEnd);
+      opacity = 1 - easeInOutQuad(p);
+      scale = 1 + 0.15 * p;
+    }
+
+    if (opacity <= 0) return null;
+
+    const cx = BOARD_W / 2;
+    const cy = BOARD_H / 2;
+    const isRed = glowColor.includes('F') || glowColor.includes('f');
+    const filterId = isRed ? 'text-glow-red' : 'text-glow-blue';
+
+    return (
+      <g opacity={opacity}>
+        {/* Semi-transparent backdrop */}
+        <rect x={0} y={0} width={BOARD_W} height={BOARD_H} fill="black" opacity={0.3 * opacity} rx={6} />
+
+        {/* Main text */}
+        <g transform={`translate(${cx}, ${cy}) scale(${scale})`} filter={`url(#${filterId})`}>
+          <text x={0} y={subText ? -10 : 8} textAnchor="middle"
+            fill={color} fontSize={56} fontWeight="bold"
+            fontFamily="KaiTi, STKaiti, FangSong, serif"
+            letterSpacing={16}
+            stroke={glowColor} strokeWidth={1} strokeOpacity={0.5}
+            style={{ userSelect: 'none' }}>
+            {text}
+          </text>
+          {subText && (
+            <text x={0} y={36} textAnchor="middle"
+              fill={color} fontSize={24} fontWeight="bold"
+              fontFamily="KaiTi, STKaiti, serif"
+              opacity={0.9}
+              style={{ userSelect: 'none' }}>
+              {subText}
+            </text>
+          )}
+        </g>
+
+        {/* Decorative lines flanking text */}
+        <line x1={cx - 160 * scale} y1={cy - 40} x2={cx - 50 * scale} y2={cy - 40}
+          stroke={color} strokeWidth={2} opacity={0.5 * opacity} />
+        <line x1={cx + 50 * scale} y1={cy - 40} x2={cx + 160 * scale} y2={cy - 40}
+          stroke={color} strokeWidth={2} opacity={0.5 * opacity} />
+        <line x1={cx - 160 * scale} y1={cy + (subText ? 50 : 25)} x2={cx - 50 * scale} y2={cy + (subText ? 50 : 25)}
+          stroke={color} strokeWidth={2} opacity={0.5 * opacity} />
+        <line x1={cx + 50 * scale} y1={cy + (subText ? 50 : 25)} x2={cx + 160 * scale} y2={cy + (subText ? 50 : 25)}
+          stroke={color} strokeWidth={2} opacity={0.5 * opacity} />
+      </g>
+    );
+  };
+
+  /* ── Click targets ── */
   const renderClickTargets = () => {
     const targets: React.ReactNode[] = [];
     for (let rank = 0; rank < RANKS; rank++) {
       for (let file = 0; file < FILES; file++) {
-        const cx = toX(file);
-        const cy = toY(rank);
+        const cx = toX(file), cy = toY(rank);
         targets.push(
-          <circle key={`click-${file}-${rank}`}
-            cx={cx} cy={cy} r={PIECE_R + 2}
-            fill="transparent"
-            style={{ cursor: 'pointer' }}
-            role="button"
+          <circle key={`click-${file}-${rank}`} cx={cx} cy={cy} r={PIECE_R + 2}
+            fill="transparent" style={{ cursor: 'pointer' }} role="button"
             aria-label={`Position ${file},${rank}`}
             onClick={(e) => { e.stopPropagation(); handleClick(file, rank); }} />
         );
@@ -693,48 +698,21 @@ export const BoardView: React.FC<BoardViewProps> = ({
     return targets;
   };
 
-  /* ── SVG Defs for effects ── */
-  const renderDefs = () => (
-    <defs>
-      <filter id="glow-red" x="-50%" y="-50%" width="200%" height="200%">
-        <feGaussianBlur stdDeviation="4" result="blur" />
-        <feFlood floodColor="#EF4444" floodOpacity="0.6" result="color" />
-        <feComposite in="color" in2="blur" operator="in" result="shadow" />
-        <feMerge>
-          <feMergeNode in="shadow" />
-          <feMergeNode in="SourceGraphic" />
-        </feMerge>
-      </filter>
-      <filter id="glow-gold" x="-50%" y="-50%" width="200%" height="200%">
-        <feGaussianBlur stdDeviation="6" result="blur" />
-        <feFlood floodColor="#FBBF24" floodOpacity="0.5" result="color" />
-        <feComposite in="color" in2="blur" operator="in" result="shadow" />
-        <feMerge>
-          <feMergeNode in="shadow" />
-          <feMergeNode in="SourceGraphic" />
-        </feMerge>
-      </filter>
-    </defs>
-  );
+  /* ══════════════════ Main render ═════════════════════════════ */
 
-  /* ── render ── */
   return (
-    <div role="grid" aria-label="Chinese Chess Board"
-      className={`relative w-full max-w-xl mx-auto ${className}`}>
-      <svg ref={svgRef}
-        viewBox={`0 0 ${BOARD_W} ${BOARD_H}`}
-        className="w-full h-auto"
-        style={{ display: 'block' }}>
+    <div role="grid" aria-label="Chinese Chess Board" className={`relative w-full max-w-xl mx-auto ${className}`}>
+      <svg ref={svgRef} viewBox={`0 0 ${BOARD_W} ${BOARD_H}`} className="w-full h-auto" style={{ display: 'block' }}>
         {renderDefs()}
 
-        {/* Board background */}
-        <rect x={0} y={0} width={BOARD_W} height={BOARD_H}
-          rx={6} ry={6} fill={t.bg} />
+        {/* Board background with 3D gradient */}
+        <rect x={0} y={0} width={BOARD_W} height={BOARD_H} rx={6} ry={6} fill="url(#board-bg)" filter="url(#board-shadow)" />
 
-        {/* Board border */}
-        <rect x={PAD - 4} y={PAD - 4}
-          width={(FILES - 1) * CELL + 8} height={(RANKS - 1) * CELL + 8}
-          fill="none" stroke={t.boardBorder} strokeWidth={3} rx={2} ry={2} />
+        {/* Board border — double line for 3D edge */}
+        <rect x={PAD - 6} y={PAD - 6} width={(FILES - 1) * CELL + 12} height={(RANKS - 1) * CELL + 12}
+          fill="none" stroke={t.boardBorder} strokeWidth={4} rx={3} ry={3} />
+        <rect x={PAD - 2} y={PAD - 2} width={(FILES - 1) * CELL + 4} height={(RANKS - 1) * CELL + 4}
+          fill="none" stroke={t.boardBorder} strokeWidth={1} rx={1} ry={1} opacity={0.5} />
 
         {renderGrid()}
         {renderPalaceDiagonals()}
@@ -746,7 +724,10 @@ export const BoardView: React.FC<BoardViewProps> = ({
         {renderCheckIndicator()}
         {renderCaptureParticles()}
         {renderPieces()}
-        {renderCheckmateOverlay()}
+
+        {/* Announcement overlay (将军/绝杀) — on top of pieces */}
+        {renderAnnouncement()}
+
         {renderClickTargets()}
       </svg>
     </div>

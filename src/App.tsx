@@ -29,10 +29,69 @@ function App() {
   const [boardTheme, setBoardTheme] = useState<'classic' | 'modern' | 'green'>('classic');
   const [gameOver, setGameOver] = useState(false);
   const [winner, setWinner] = useState<Color | null>(null);
-  const [message, setMessage] = useState('');
+  const [statusText, setStatusText] = useState('');
   const aiRunning = useRef(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => { initializeAudio(); }, [initializeAudio]);
+
+  /* ── Enhanced audio: synthesize check/checkmate sounds ── */
+  const getAudioCtx = useCallback(() => {
+    if (!audioCtxRef.current) {
+      try {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      } catch { /* silent */ }
+    }
+    return audioCtxRef.current;
+  }, []);
+
+  const playCheckSound = useCallback(() => {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    // Dramatic two-tone alert
+    [660, 880].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.15);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime + i * 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.15 + 0.3);
+      osc.start(ctx.currentTime + i * 0.15);
+      osc.stop(ctx.currentTime + i * 0.15 + 0.3);
+    });
+  }, [getAudioCtx]);
+
+  const playCheckmateSound = useCallback(() => {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    // Epic descending chord
+    const freqs = [880, 660, 440, 330, 220];
+    freqs.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = i < 2 ? 'triangle' : 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.12);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime + i * 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.12 + 0.5);
+      osc.start(ctx.currentTime + i * 0.12);
+      osc.stop(ctx.currentTime + i * 0.12 + 0.5);
+    });
+
+    // Speech announcement after sound effect
+    setTimeout(() => {
+      if ('speechSynthesis' in window) {
+        const u = new SpeechSynthesisUtterance('绝杀');
+        u.lang = 'zh-CN';
+        u.rate = 0.8;
+        u.pitch = 0.8;
+        speechSynthesis.speak(u);
+      }
+    }, 700);
+  }, [getAudioCtx]);
 
   /* ── game status detection ── */
   useEffect(() => {
@@ -48,42 +107,29 @@ function App() {
           : status.status === 'stalemate'
           ? '和棋！无子可动'
           : '和棋！';
-      setMessage(msg);
+      setStatusText(msg);
 
-      if ('speechSynthesis' in window) {
-        const u = new SpeechSynthesisUtterance(msg);
-        u.lang = 'zh-CN';
-        u.rate = 0.9;
-        speechSynthesis.speak(u);
+      if (status.status === 'checkmate') {
+        playCheckmateSound();
       }
     } else if (status.status === 'check') {
       const checkMsg = gameState.board.turn === Color.Red ? '红方被将军！' : '黑方被将军！';
-      setMessage(checkMsg);
-
-      if ('speechSynthesis' in window) {
-        const u = new SpeechSynthesisUtterance('将军！');
-        u.lang = 'zh-CN';
-        u.rate = 1.1;
-        speechSynthesis.speak(u);
-      }
+      setStatusText(checkMsg);
+      playCheckSound();
     } else {
-      setMessage('');
+      setStatusText('');
     }
-  }, [gameState]);
+  }, [gameState, playCheckSound, playCheckmateSound]);
 
   /* ── AI move ── */
   useEffect(() => {
-    // Gate: only in PvAI, Black's turn, game not over, AI not already running
     if (gameMode !== 'pvai') return;
     if (gameOver) return;
     if (gameState.board.turn !== Color.Black) return;
     if (aiRunning.current) return;
 
-    // Double-check game status before kicking off AI
     const status = evaluateGameStatus(gameState.board);
-    if (status.status === 'checkmate' || status.status === 'stalemate' || status.status === 'draw') {
-      return;
-    }
+    if (status.status === 'checkmate' || status.status === 'stalemate' || status.status === 'draw') return;
 
     aiRunning.current = true;
 
@@ -99,12 +145,11 @@ function App() {
         if (result.move?.from && result.move?.to) {
           makeMove(result.move.from, result.move.to);
         } else {
-          // No valid move → game must be over
           const s = evaluateGameStatus(gameState.board);
           if (s.status === 'checkmate' || s.status === 'stalemate') {
             setGameOver(true);
             setWinner(s.winner || null);
-            setMessage(
+            setStatusText(
               s.status === 'checkmate'
                 ? `绝杀！${s.winner === Color.Red ? '红方' : '黑方'}获胜！`
                 : '和棋！无子可动'
@@ -126,12 +171,10 @@ function App() {
       if (!position) { selectPosition(null); return; }
 
       const state = useGameStore.getState();
-
       if (state.selectedPosition) {
         const success = makeMove(state.selectedPosition, position);
         if (success) { selectPosition(null); return; }
       }
-
       selectPosition(position);
     },
     [selectPosition, makeMove, gameOver],
@@ -141,14 +184,13 @@ function App() {
     resetGame();
     setGameOver(false);
     setWinner(null);
-    setMessage('');
+    setStatusText('');
     aiRunning.current = false;
   };
 
   /* ── UI ── */
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-amber-100 flex flex-col items-center p-4">
-      {/* Header */}
       <header className="text-center mb-4">
         <h1 className="text-3xl font-bold text-amber-900">中国象棋</h1>
         <p className="text-sm text-amber-700">Chinese Chess</p>
@@ -159,13 +201,13 @@ function App() {
         <span className="font-semibold">
           {gameState.board.turn === Color.Red ? '🔴 红方走棋' : '⚫ 黑方走棋'}
         </span>
-        {message && (
+        {statusText && (
           <span className={`font-bold text-sm px-3 py-1 rounded ${
-            message.includes('绝杀') ? 'bg-red-600 text-white' :
-            message.includes('将军') ? 'bg-orange-500 text-white' :
+            statusText.includes('绝杀') ? 'bg-red-600 text-white' :
+            statusText.includes('将军') ? 'bg-orange-500 text-white' :
             'text-amber-800'
           }`}>
-            {message}
+            {statusText}
           </span>
         )}
         <span className="text-sm text-amber-700">
@@ -173,7 +215,7 @@ function App() {
         </span>
       </div>
 
-      {/* Board */}
+      {/* Board — announcement overlay renders INSIDE the SVG, no modal */}
       <div className="w-full max-w-xl bg-white p-4 rounded-lg shadow-lg">
         <BoardView
           pieces={gameState.board.pieces}
@@ -181,7 +223,7 @@ function App() {
           validMoves={validMoves}
           lastMove={lastMove}
           inCheck={inCheck}
-          isCheckmate={gameOver && message.includes('绝杀')}
+          isCheckmate={gameOver && statusText.includes('绝杀')}
           checkmateWinner={winner}
           onPositionSelect={handlePositionSelect}
           flipBoard={flipBoard}
@@ -209,7 +251,7 @@ function App() {
         </button>
       </div>
 
-      {/* Settings row */}
+      {/* Settings */}
       <div className="w-full max-w-xl mt-2 flex flex-wrap items-center gap-2 text-sm">
         <select value={boardTheme}
           onChange={(e) => setBoardTheme(e.target.value as 'classic' | 'modern' | 'green')}
@@ -240,26 +282,19 @@ function App() {
         <VolumeControl />
       </div>
 
-      {/* Game Over Modal */}
+      {/* Game over — simple bottom bar instead of modal */}
       {gameOver && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-             onClick={handleReset}>
-          <div className="bg-white p-8 rounded-xl shadow-2xl text-center max-w-sm mx-4"
-               onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold mb-3 text-amber-900">{message}</h2>
-            {winner && (
-              <div className="text-xl mb-5">
-                <p className="mb-1">🏆 获胜者</p>
-                <p className={`font-bold ${winner === Color.Red ? 'text-red-600' : 'text-gray-900'}`}>
-                  {winner === Color.Red ? '🔴 红方' : '⚫ 黑方'}
-                </p>
-              </div>
-            )}
-            <button onClick={handleReset}
-              className="px-8 py-3 bg-amber-600 text-white text-lg rounded-lg hover:bg-amber-700 transition">
-              🔄 再来一局
-            </button>
-          </div>
+        <div className="w-full max-w-xl mt-3 p-4 bg-white rounded-lg shadow-lg text-center">
+          <p className="text-lg font-bold text-amber-900 mb-2">{statusText}</p>
+          {winner && (
+            <p className={`text-base mb-3 ${winner === Color.Red ? 'text-red-600' : 'text-gray-900'}`}>
+              🏆 {winner === Color.Red ? '红方' : '黑方'}获胜
+            </p>
+          )}
+          <button onClick={handleReset}
+            className="px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition text-sm font-medium">
+            🔄 再来一局
+          </button>
         </div>
       )}
 

@@ -1,47 +1,6 @@
 /**
  * Animation system for Chinese Chess
- * 
- * Provides animation state management for:
- * - Piece move (slide from → to)
- * - Capture (burst particles at capture position)
- * - Check (pulsing red glow on general)
- * - Checkmate (dramatic full-board effect)
  */
-
-export interface MoveAnimation {
-  type: 'move';
-  fromX: number;
-  fromY: number;
-  toX: number;
-  toY: number;
-  startTime: number;
-  duration: number; // ms
-}
-
-export interface CaptureAnimation {
-  type: 'capture';
-  x: number;
-  y: number;
-  startTime: number;
-  duration: number;
-}
-
-export interface CheckAnimation {
-  type: 'check';
-  x: number;
-  y: number;
-}
-
-export interface CheckmateAnimation {
-  type: 'checkmate';
-  x: number;
-  y: number;
-  startTime: number;
-  duration: number;
-  winner: 'red' | 'black';
-}
-
-export type BoardAnimation = MoveAnimation | CaptureAnimation | CheckAnimation | CheckmateAnimation;
 
 // Easing functions
 export function easeOutCubic(t: number): number {
@@ -60,9 +19,27 @@ export function easeOutElastic(t: number): number {
   return Math.pow(2, -10 * t) * Math.sin((t - p / 4) * (2 * Math.PI) / p) + 1;
 }
 
+export function easeInOutQuad(t: number): number {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
 // Animation durations (ms)
 export const ANIM_DURATION = {
   move: 280,
   capture: 450,
   checkmate: 1500,
+  announcement: 1800,   // total time for text announcement
+  announceFadeIn: 300,   // scale up + fade in
+  announceHold: 1200,    // hold visible
+  announceFadeOut: 300,  // fade out
 } as const;
+
+/** Announcement overlay state */
+export interface Announcement {
+  text: string;
+  subText?: string;
+  color: string;       // main text color
+  glowColor: string;   // glow/shadow color
+  startTime: number;
+  duration: number;
+}
