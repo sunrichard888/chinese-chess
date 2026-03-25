@@ -29,7 +29,7 @@ interface BoardViewProps {
   onPositionSelect?: (position: Position) => void;
   className?: string;
   flipBoard?: boolean;
-  theme?: 'classic' | 'modern' | 'green';
+  theme?: 'classic' | 'stone' | 'glass';
 }
 
 /* ─────────────────────────── constants ─────────────────────── */
@@ -47,24 +47,32 @@ const BOARD_H = (RANKS - 1) * CELL + PAD * 2;
 /* ─────────────────────────── themes (3D enhanced) ─────────── */
 
 interface ThemeColors {
+  id: string;
   bg: string;
-  bgGradient: [string, string];  // top, bottom for 3D feel
+  bgGradient: [string, string];
   gridLine: string;
   gridLineWidth: number;
   river: string;
   riverText: string;
   pieceStroke: string;
-  // 3D piece colors: [highlight, base, shadow] for radial gradient
   pieceGradRed: [string, string, string];
   pieceGradBlack: [string, string, string];
   pieceTextRed: string;
   pieceTextBlack: string;
   boardBorder: string;
   boardShadow: string;
+  // Extended 3D properties
+  boardTexture?: 'wood' | 'stone' | 'glass';
+  pieceStyle?: 'classic' | 'jade' | 'crystal';
+  gridShadow?: boolean;
+  innerGlow?: string;
+  surfaceNoise?: number;     // feTurbulence base frequency for texture
+  surfaceOctaves?: number;
 }
 
 const themes: Record<string, ThemeColors> = {
   classic: {
+    id: 'classic',
     bg: '#F0D9B5',
     bgGradient: ['#F5E6CC', '#D4A76A'],
     gridLine: '#5C3317',
@@ -78,36 +86,52 @@ const themes: Record<string, ThemeColors> = {
     pieceTextBlack: '#1A1A1A',
     boardBorder: '#4A2810',
     boardShadow: '#3D2010',
+    boardTexture: 'wood',
+    pieceStyle: 'classic',
   },
-  modern: {
-    bg: '#1A1A2E',
-    bgGradient: ['#22223B', '#121220'],
-    gridLine: '#E94560',
-    gridLineWidth: 1.2,
-    river: '#0F3460',
-    riverText: '#E94560',
-    pieceStroke: '#E94560',
-    pieceGradRed: ['#3D2D44', '#2D1D34', '#1D0D24'],
-    pieceGradBlack: ['#3D3D54', '#2D2D44', '#1D1D34'],
-    pieceTextRed: '#FF6B81',
-    pieceTextBlack: '#E0E0E0',
-    boardBorder: '#E94560',
-    boardShadow: '#0A0A18',
+  stone: {
+    id: 'stone',
+    bg: '#6B7B8D',
+    bgGradient: ['#8899AA', '#4A5568'],
+    gridLine: '#2D3748',
+    gridLineWidth: 1.8,
+    river: '#5A6A7A',
+    riverText: '#E2E8F0',
+    pieceStroke: '#1A202C',
+    // Jade-like pieces on stone board
+    pieceGradRed: ['#F0FFF0', '#B8D8B0', '#6B8E6B'],
+    pieceGradBlack: ['#2D2D2D', '#1A1A1A', '#0D0D0D'],
+    pieceTextRed: '#8B0000',
+    pieceTextBlack: '#D4AF37',
+    boardBorder: '#2D3748',
+    boardShadow: '#1A202C',
+    boardTexture: 'stone',
+    pieceStyle: 'jade',
+    gridShadow: true,
+    surfaceNoise: 0.65,
+    surfaceOctaves: 4,
   },
-  green: {
-    bg: '#2E6B2E',
-    bgGradient: ['#3A7A3A', '#1E4E1E'],
-    gridLine: '#1A3D1A',
-    gridLineWidth: 1.5,
-    river: '#3D8B3D',
-    riverText: '#1A3D1A',
-    pieceStroke: '#2A4F2A',
-    pieceGradRed: ['#F0F8F0', '#D8E8D8', '#A0C0A0'],
-    pieceGradBlack: ['#F0F8F0', '#D8E8D8', '#A0C0A0'],
-    pieceTextRed: '#CC0000',
-    pieceTextBlack: '#1A1A1A',
-    boardBorder: '#1A3D1A',
-    boardShadow: '#0D1F0D',
+  glass: {
+    id: 'glass',
+    bg: '#0F172A',
+    bgGradient: ['#1E293B', '#0F172A'],
+    gridLine: 'rgba(148,163,184,0.4)',
+    gridLineWidth: 1,
+    river: 'rgba(59,130,246,0.15)',
+    riverText: 'rgba(148,163,184,0.7)',
+    pieceStroke: 'rgba(148,163,184,0.3)',
+    // Frosted glass pieces
+    pieceGradRed: ['rgba(255,200,200,0.35)', 'rgba(220,80,80,0.25)', 'rgba(180,40,40,0.15)'],
+    pieceGradBlack: ['rgba(200,220,255,0.35)', 'rgba(100,140,200,0.25)', 'rgba(60,100,160,0.15)'],
+    pieceTextRed: '#FCA5A5',
+    pieceTextBlack: '#93C5FD',
+    boardBorder: 'rgba(148,163,184,0.2)',
+    boardShadow: '#020617',
+    boardTexture: 'glass',
+    pieceStyle: 'crystal',
+    innerGlow: 'rgba(59,130,246,0.08)',
+    surfaceNoise: 0.8,
+    surfaceOctaves: 3,
   },
 };
 
@@ -337,13 +361,89 @@ export const BoardView: React.FC<BoardViewProps> = ({
 
   const renderDefs = () => (
     <defs>
-      {/* Board wood grain */}
+      {/* ── Board backgrounds ── */}
       <linearGradient id="board-bg" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stopColor={t.bgGradient[0]} />
         <stop offset="100%" stopColor={t.bgGradient[1]} />
       </linearGradient>
 
-      {/* 3D piece gradients */}
+      {/* Stone texture: feTurbulence marble veins */}
+      {t.boardTexture === 'stone' && (
+        <>
+          <filter id="stone-texture" x="0" y="0" width="100%" height="100%">
+            <feTurbulence type="fractalNoise" baseFrequency={t.surfaceNoise ?? 0.65}
+              numOctaves={t.surfaceOctaves ?? 4} seed={42} result="noise" />
+            <feColorMatrix type="saturate" values="0" in="noise" result="gray" />
+            <feBlend in="SourceGraphic" in2="gray" mode="multiply" />
+          </filter>
+          {/* Subtle stone surface specular highlight */}
+          <linearGradient id="stone-specular" x1="0" y1="0" x2="0.3" y2="1">
+            <stop offset="0%" stopColor="white" stopOpacity="0.08" />
+            <stop offset="40%" stopColor="white" stopOpacity="0" />
+            <stop offset="60%" stopColor="white" stopOpacity="0" />
+            <stop offset="100%" stopColor="black" stopOpacity="0.1" />
+          </linearGradient>
+          {/* Engraved grid line effect */}
+          <filter id="engrave" x="-5%" y="-5%" width="110%" height="110%">
+            <feOffset dx="0" dy="1" in="SourceGraphic" result="offset" />
+            <feFlood floodColor="white" floodOpacity="0.15" result="light" />
+            <feComposite in="light" in2="offset" operator="in" result="highlight" />
+            <feMerge>
+              <feMergeNode in="SourceGraphic" />
+              <feMergeNode in="highlight" />
+            </feMerge>
+          </filter>
+        </>
+      )}
+
+      {/* Glass theme: frosted glass + backdrop blur simulation */}
+      {t.boardTexture === 'glass' && (
+        <>
+          <filter id="glass-frost" x="0" y="0" width="100%" height="100%">
+            <feTurbulence type="fractalNoise" baseFrequency={t.surfaceNoise ?? 0.8}
+              numOctaves={t.surfaceOctaves ?? 3} seed={7} result="noise" />
+            <feColorMatrix type="saturate" values="0" in="noise" result="gray" />
+            <feBlend in="SourceGraphic" in2="gray" mode="soft-light" result="frosted" />
+            <feGaussianBlur in="frosted" stdDeviation="0.5" />
+          </filter>
+          {/* Glass surface reflection */}
+          <linearGradient id="glass-reflection" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="white" stopOpacity="0.06" />
+            <stop offset="30%" stopColor="white" stopOpacity="0.02" />
+            <stop offset="70%" stopColor="white" stopOpacity="0" />
+            <stop offset="100%" stopColor="white" stopOpacity="0.03" />
+          </linearGradient>
+          {/* Neon grid glow */}
+          <filter id="grid-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          {/* Crystal piece inner glow */}
+          <filter id="crystal-glow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feFlood floodColor="rgba(100,180,255,0.3)" result="color" />
+            <feComposite in="color" in2="blur" operator="in" result="glow" />
+            <feMerge>
+              <feMergeNode in="glow" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <filter id="crystal-glow-red" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feFlood floodColor="rgba(255,120,120,0.3)" result="color" />
+            <feComposite in="color" in2="blur" operator="in" result="glow" />
+            <feMerge>
+              <feMergeNode in="glow" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </>
+      )}
+
+      {/* ── 3D piece gradients ── */}
       <radialGradient id="piece-grad-red" cx="40%" cy="35%" r="60%">
         <stop offset="0%" stopColor={t.pieceGradRed[0]} />
         <stop offset="60%" stopColor={t.pieceGradRed[1]} />
@@ -357,13 +457,24 @@ export const BoardView: React.FC<BoardViewProps> = ({
 
       {/* Piece bevel highlight */}
       <radialGradient id="piece-highlight" cx="35%" cy="30%" r="50%">
-        <stop offset="0%" stopColor="white" stopOpacity="0.4" />
+        <stop offset="0%" stopColor="white" stopOpacity={t.pieceStyle === 'crystal' ? '0.25' : '0.4'} />
         <stop offset="100%" stopColor="white" stopOpacity="0" />
       </radialGradient>
 
+      {/* Jade piece special highlight — green tint refraction */}
+      {t.pieceStyle === 'jade' && (
+        <radialGradient id="jade-refraction" cx="55%" cy="60%" r="45%">
+          <stop offset="0%" stopColor="#90EE90" stopOpacity="0.12" />
+          <stop offset="100%" stopColor="#006400" stopOpacity="0" />
+        </radialGradient>
+      )}
+
       {/* Drop shadow filter */}
       <filter id="piece-shadow" x="-20%" y="-10%" width="140%" height="150%">
-        <feDropShadow dx="1.5" dy="3" stdDeviation="2.5" floodColor="rgba(0,0,0,0.35)" />
+        <feDropShadow dx={t.pieceStyle === 'crystal' ? '0' : '1.5'}
+          dy={t.pieceStyle === 'crystal' ? '2' : '3'}
+          stdDeviation={t.pieceStyle === 'crystal' ? '4' : '2.5'}
+          floodColor={t.pieceStyle === 'crystal' ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.35)'} />
       </filter>
 
       {/* Board edge shadow */}
@@ -376,21 +487,13 @@ export const BoardView: React.FC<BoardViewProps> = ({
         <feGaussianBlur stdDeviation="8" result="blur" />
         <feFlood floodColor="#FF0000" floodOpacity="0.6" result="color" />
         <feComposite in="color" in2="blur" operator="in" result="glow" />
-        <feMerge>
-          <feMergeNode in="glow" />
-          <feMergeNode in="glow" />
-          <feMergeNode in="SourceGraphic" />
-        </feMerge>
+        <feMerge><feMergeNode in="glow" /><feMergeNode in="glow" /><feMergeNode in="SourceGraphic" /></feMerge>
       </filter>
       <filter id="text-glow-blue" x="-50%" y="-50%" width="200%" height="200%">
         <feGaussianBlur stdDeviation="8" result="blur" />
         <feFlood floodColor="#2266DD" floodOpacity="0.6" result="color" />
         <feComposite in="color" in2="blur" operator="in" result="glow" />
-        <feMerge>
-          <feMergeNode in="glow" />
-          <feMergeNode in="glow" />
-          <feMergeNode in="SourceGraphic" />
-        </feMerge>
+        <feMerge><feMergeNode in="glow" /><feMergeNode in="glow" /><feMergeNode in="SourceGraphic" /></feMerge>
       </filter>
 
       {/* Check ring glow */}
@@ -398,10 +501,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
         <feGaussianBlur stdDeviation="5" result="blur" />
         <feFlood floodColor="#FF0000" floodOpacity="0.5" result="color" />
         <feComposite in="color" in2="blur" operator="in" result="glow" />
-        <feMerge>
-          <feMergeNode in="glow" />
-          <feMergeNode in="SourceGraphic" />
-        </feMerge>
+        <feMerge><feMergeNode in="glow" /><feMergeNode in="SourceGraphic" /></feMerge>
       </filter>
     </defs>
   );
@@ -568,6 +668,9 @@ export const BoardView: React.FC<BoardViewProps> = ({
       const label = PIECE_LABELS[piece.type][piece.color];
       const isRed = piece.color === Color.Red;
       const gradId = isRed ? 'piece-grad-red' : 'piece-grad-black';
+      const pieceFilter = t.pieceStyle === 'crystal'
+        ? (isRed ? 'url(#crystal-glow-red)' : 'url(#crystal-glow)')
+        : 'url(#piece-shadow)';
 
       // Landing bounce scale
       let scaleStr = '';
@@ -578,17 +681,51 @@ export const BoardView: React.FC<BoardViewProps> = ({
       }
 
       return (
-        <g key={stableKey} transform={`translate(${cx}, ${cy})${scaleStr}`} style={{ cursor: 'pointer' }} filter="url(#piece-shadow)">
-          {/* 3D base (dark bottom edge) */}
-          <ellipse cx={0} cy={3} rx={PIECE_R} ry={PIECE_R * 0.85} fill={t.pieceStroke} opacity={0.5} />
+        <g key={stableKey} transform={`translate(${cx}, ${cy})${scaleStr}`} style={{ cursor: 'pointer' }} filter={pieceFilter}>
+          {/* 3D base — varies by style */}
+          {t.pieceStyle === 'crystal' ? (
+            /* Glass/Crystal: soft glow ring underneath */
+            <circle cx={0} cy={2} r={PIECE_R + 2}
+              fill={isRed ? 'rgba(255,100,100,0.1)' : 'rgba(100,150,255,0.1)'} />
+          ) : t.pieceStyle === 'jade' ? (
+            /* Stone/Jade: thicker base shadow for heavy stone feel */
+            <ellipse cx={0} cy={4} rx={PIECE_R + 1} ry={PIECE_R * 0.8}
+              fill="rgba(0,0,0,0.4)" />
+          ) : (
+            /* Classic wood: standard ellipse shadow */
+            <ellipse cx={0} cy={3} rx={PIECE_R} ry={PIECE_R * 0.85}
+              fill={t.pieceStroke} opacity={0.5} />
+          )}
+
           {/* Main body with gradient */}
-          <circle cx={0} cy={0} r={PIECE_R} fill={`url(#${gradId})`} stroke={t.pieceStroke} strokeWidth={1.5} />
+          <circle cx={0} cy={0} r={PIECE_R}
+            fill={`url(#${gradId})`}
+            stroke={t.pieceStroke}
+            strokeWidth={t.pieceStyle === 'crystal' ? 0.8 : 1.5} />
+
           {/* Highlight overlay for 3D convexity */}
           <circle cx={0} cy={0} r={PIECE_R} fill="url(#piece-highlight)" />
-          {/* Rim / inner ring with 3D inset look */}
+
+          {/* Jade refraction overlay */}
+          {t.pieceStyle === 'jade' && isRed && (
+            <circle cx={0} cy={0} r={PIECE_R} fill="url(#jade-refraction)" />
+          )}
+
+          {/* Crystal: inner frosted ring */}
+          {t.pieceStyle === 'crystal' && (
+            <circle cx={0} cy={0} r={PIECE_R - 2}
+              fill="none"
+              stroke={isRed ? 'rgba(255,180,180,0.2)' : 'rgba(180,200,255,0.2)'}
+              strokeWidth={1} />
+          )}
+
+          {/* Rim / inner ring */}
           <circle cx={0} cy={-0.5} r={PIECE_R - 4} fill="none"
-            stroke={isRed ? t.pieceTextRed : t.pieceTextBlack} strokeWidth={0.8} opacity={0.4} />
-          {/* Character with slight text shadow */}
+            stroke={isRed ? t.pieceTextRed : t.pieceTextBlack}
+            strokeWidth={t.pieceStyle === 'crystal' ? 0.5 : 0.8}
+            opacity={t.pieceStyle === 'crystal' ? 0.3 : 0.4} />
+
+          {/* Character */}
           <text x={0} y={FONT_SIZE * 0.35 - 0.5} textAnchor="middle"
             fill={isRed ? t.pieceTextRed : t.pieceTextBlack}
             fontSize={FONT_SIZE} fontFamily="KaiTi, STKaiti, SimSun, serif" fontWeight="bold"
@@ -705,17 +842,56 @@ export const BoardView: React.FC<BoardViewProps> = ({
       <svg ref={svgRef} viewBox={`0 0 ${BOARD_W} ${BOARD_H}`} className="w-full h-auto" style={{ display: 'block' }}>
         {renderDefs()}
 
-        {/* Board background with 3D gradient */}
+        {/* Board background with 3D gradient + texture */}
         <rect x={0} y={0} width={BOARD_W} height={BOARD_H} rx={6} ry={6} fill="url(#board-bg)" filter="url(#board-shadow)" />
 
-        {/* Board border — double line for 3D edge */}
-        <rect x={PAD - 6} y={PAD - 6} width={(FILES - 1) * CELL + 12} height={(RANKS - 1) * CELL + 12}
-          fill="none" stroke={t.boardBorder} strokeWidth={4} rx={3} ry={3} />
-        <rect x={PAD - 2} y={PAD - 2} width={(FILES - 1) * CELL + 4} height={(RANKS - 1) * CELL + 4}
-          fill="none" stroke={t.boardBorder} strokeWidth={1} rx={1} ry={1} opacity={0.5} />
+        {/* Stone texture overlay */}
+        {t.boardTexture === 'stone' && (
+          <rect x={0} y={0} width={BOARD_W} height={BOARD_H} rx={6} ry={6}
+            fill="url(#board-bg)" filter="url(#stone-texture)" opacity={0.7} />
+        )}
+        {t.boardTexture === 'stone' && (
+          <rect x={0} y={0} width={BOARD_W} height={BOARD_H} rx={6} ry={6}
+            fill="url(#stone-specular)" />
+        )}
 
-        {renderGrid()}
-        {renderPalaceDiagonals()}
+        {/* Glass frost overlay */}
+        {t.boardTexture === 'glass' && (
+          <>
+            <rect x={0} y={0} width={BOARD_W} height={BOARD_H} rx={6} ry={6}
+              fill="url(#board-bg)" filter="url(#glass-frost)" opacity={0.5} />
+            <rect x={0} y={0} width={BOARD_W} height={BOARD_H} rx={6} ry={6}
+              fill="url(#glass-reflection)" />
+            {/* Ambient glow spots for glass theme */}
+            <circle cx={BOARD_W * 0.25} cy={BOARD_H * 0.3} r={120}
+              fill="rgba(59,130,246,0.04)" />
+            <circle cx={BOARD_W * 0.75} cy={BOARD_H * 0.7} r={100}
+              fill="rgba(139,92,246,0.03)" />
+          </>
+        )}
+
+        {/* Board border */}
+        {t.boardTexture === 'glass' ? (
+          /* Glass: single thin luminous border */
+          <rect x={PAD - 4} y={PAD - 4}
+            width={(FILES - 1) * CELL + 8} height={(RANKS - 1) * CELL + 8}
+            fill="none" stroke={t.boardBorder} strokeWidth={1} rx={2} ry={2} />
+        ) : (
+          /* Classic / Stone: double line for 3D edge */
+          <>
+            <rect x={PAD - 6} y={PAD - 6} width={(FILES - 1) * CELL + 12} height={(RANKS - 1) * CELL + 12}
+              fill="none" stroke={t.boardBorder} strokeWidth={4} rx={3} ry={3} />
+            <rect x={PAD - 2} y={PAD - 2} width={(FILES - 1) * CELL + 4} height={(RANKS - 1) * CELL + 4}
+              fill="none" stroke={t.boardBorder} strokeWidth={1} rx={1} ry={1} opacity={0.5} />
+          </>
+        )}
+
+        {/* Grid lines — optionally with glow or engrave */}
+        <g filter={t.boardTexture === 'glass' ? 'url(#grid-glow)' : t.gridShadow ? 'url(#engrave)' : undefined}>
+          {renderGrid()}
+          {renderPalaceDiagonals()}
+        </g>
+
         {renderRiver()}
         {renderCrossMarks()}
         {renderLastMoveHighlight()}
@@ -724,10 +900,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
         {renderCheckIndicator()}
         {renderCaptureParticles()}
         {renderPieces()}
-
-        {/* Announcement overlay (将军/绝杀) — on top of pieces */}
         {renderAnnouncement()}
-
         {renderClickTargets()}
       </svg>
     </div>

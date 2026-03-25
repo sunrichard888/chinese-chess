@@ -26,7 +26,7 @@ function App() {
   } = useGameStore();
 
   const [flipBoard, setFlipBoard] = useState(false);
-  const [boardTheme, setBoardTheme] = useState<'classic' | 'modern' | 'green'>('classic');
+  const [boardTheme, setBoardTheme] = useState<'classic' | 'stone' | 'glass'>('classic');
   const [gameOver, setGameOver] = useState(false);
   const [winner, setWinner] = useState<Color | null>(null);
   const [statusText, setStatusText] = useState('');
@@ -254,11 +254,11 @@ function App() {
       {/* Settings */}
       <div className="w-full max-w-xl mt-2 flex flex-wrap items-center gap-2 text-sm">
         <select value={boardTheme}
-          onChange={(e) => setBoardTheme(e.target.value as 'classic' | 'modern' | 'green')}
+          onChange={(e) => setBoardTheme(e.target.value as 'classic' | 'stone' | 'glass')}
           className="px-3 py-1.5 border rounded-lg bg-white">
-          <option value="classic">🎨 经典木纹</option>
-          <option value="modern">⚫ 现代简约</option>
-          <option value="green">🌿 绿色棋盘</option>
+          <option value="classic">🪵 经典木纹</option>
+          <option value="stone">🪨 青石玉棋</option>
+          <option value="glass">💎 水晶琉璃</option>
         </select>
 
         <select value={gameMode}
