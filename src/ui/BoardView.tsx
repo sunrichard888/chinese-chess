@@ -91,47 +91,42 @@ const themes: Record<string, ThemeColors> = {
   },
   stone: {
     id: 'stone',
-    bg: '#6B7B8D',
-    bgGradient: ['#8899AA', '#4A5568'],
-    gridLine: '#2D3748',
+    bg: '#708090',
+    bgGradient: ['#9AACBA', '#556677'],
+    gridLine: '#2C3E50',
     gridLineWidth: 1.8,
-    river: '#5A6A7A',
-    riverText: '#E2E8F0',
-    pieceStroke: '#1A202C',
-    // Jade-like pieces on stone board
-    pieceGradRed: ['#F0FFF0', '#B8D8B0', '#6B8E6B'],
-    pieceGradBlack: ['#2D2D2D', '#1A1A1A', '#0D0D0D'],
-    pieceTextRed: '#8B0000',
+    river: '#607080',
+    riverText: '#E8ECF0',
+    pieceStroke: '#3D4F5F',
+    // Green jade red pieces, black obsidian black pieces — solid opaque colors
+    pieceGradRed: ['#C8E6C0', '#7CB870', '#4A8040'],
+    pieceGradBlack: ['#4A4A4A', '#2A2A2A', '#151515'],
+    pieceTextRed: '#6B0000',
     pieceTextBlack: '#D4AF37',
-    boardBorder: '#2D3748',
-    boardShadow: '#1A202C',
+    boardBorder: '#3D4F5F',
+    boardShadow: '#1A2530',
     boardTexture: 'stone',
     pieceStyle: 'jade',
     gridShadow: true,
-    surfaceNoise: 0.65,
-    surfaceOctaves: 4,
   },
   glass: {
     id: 'glass',
-    bg: '#0F172A',
-    bgGradient: ['#1E293B', '#0F172A'],
-    gridLine: 'rgba(148,163,184,0.4)',
-    gridLineWidth: 1,
-    river: 'rgba(59,130,246,0.15)',
-    riverText: 'rgba(148,163,184,0.7)',
-    pieceStroke: 'rgba(148,163,184,0.3)',
-    // Frosted glass pieces
-    pieceGradRed: ['rgba(255,200,200,0.35)', 'rgba(220,80,80,0.25)', 'rgba(180,40,40,0.15)'],
-    pieceGradBlack: ['rgba(200,220,255,0.35)', 'rgba(100,140,200,0.25)', 'rgba(60,100,160,0.15)'],
-    pieceTextRed: '#FCA5A5',
-    pieceTextBlack: '#93C5FD',
-    boardBorder: 'rgba(148,163,184,0.2)',
-    boardShadow: '#020617',
+    bg: '#141E30',
+    bgGradient: ['#1C2A3F', '#0D1520'],
+    gridLine: '#5A8ABF',
+    gridLineWidth: 1.2,
+    river: '#1A2A40',
+    riverText: '#7AADD4',
+    pieceStroke: '#4A7AAA',
+    // Crystal-clear pieces — solid enough to be readable
+    pieceGradRed: ['#FFD0D0', '#E06060', '#A03030'],
+    pieceGradBlack: ['#D0DFFF', '#6090D0', '#3060A0'],
+    pieceTextRed: '#FFE0E0',
+    pieceTextBlack: '#E0EDFF',
+    boardBorder: '#4A7AAA',
+    boardShadow: '#050A10',
     boardTexture: 'glass',
     pieceStyle: 'crystal',
-    innerGlow: 'rgba(59,130,246,0.08)',
-    surfaceNoise: 0.8,
-    surfaceOctaves: 3,
   },
 };
 
@@ -367,26 +362,18 @@ export const BoardView: React.FC<BoardViewProps> = ({
         <stop offset="100%" stopColor={t.bgGradient[1]} />
       </linearGradient>
 
-      {/* Stone texture: feTurbulence marble veins */}
+      {/* Stone theme: clean specular highlight, no feTurbulence noise */}
       {t.boardTexture === 'stone' && (
         <>
-          <filter id="stone-texture" x="0" y="0" width="100%" height="100%">
-            <feTurbulence type="fractalNoise" baseFrequency={t.surfaceNoise ?? 0.65}
-              numOctaves={t.surfaceOctaves ?? 4} seed={42} result="noise" />
-            <feColorMatrix type="saturate" values="0" in="noise" result="gray" />
-            <feBlend in="SourceGraphic" in2="gray" mode="multiply" />
-          </filter>
-          {/* Subtle stone surface specular highlight */}
           <linearGradient id="stone-specular" x1="0" y1="0" x2="0.3" y2="1">
-            <stop offset="0%" stopColor="white" stopOpacity="0.08" />
-            <stop offset="40%" stopColor="white" stopOpacity="0" />
-            <stop offset="60%" stopColor="white" stopOpacity="0" />
-            <stop offset="100%" stopColor="black" stopOpacity="0.1" />
+            <stop offset="0%" stopColor="white" stopOpacity="0.12" />
+            <stop offset="50%" stopColor="white" stopOpacity="0" />
+            <stop offset="100%" stopColor="black" stopOpacity="0.08" />
           </linearGradient>
-          {/* Engraved grid line effect */}
+          {/* Engraved line effect: line + light edge below = chiseled groove */}
           <filter id="engrave" x="-5%" y="-5%" width="110%" height="110%">
             <feOffset dx="0" dy="1" in="SourceGraphic" result="offset" />
-            <feFlood floodColor="white" floodOpacity="0.15" result="light" />
+            <feFlood floodColor="white" floodOpacity="0.25" result="light" />
             <feComposite in="light" in2="offset" operator="in" result="highlight" />
             <feMerge>
               <feMergeNode in="SourceGraphic" />
@@ -396,44 +383,35 @@ export const BoardView: React.FC<BoardViewProps> = ({
         </>
       )}
 
-      {/* Glass theme: frosted glass + backdrop blur simulation */}
+      {/* Glass theme: clean dark surface with subtle reflection, NO frosted blur */}
       {t.boardTexture === 'glass' && (
         <>
-          <filter id="glass-frost" x="0" y="0" width="100%" height="100%">
-            <feTurbulence type="fractalNoise" baseFrequency={t.surfaceNoise ?? 0.8}
-              numOctaves={t.surfaceOctaves ?? 3} seed={7} result="noise" />
-            <feColorMatrix type="saturate" values="0" in="noise" result="gray" />
-            <feBlend in="SourceGraphic" in2="gray" mode="soft-light" result="frosted" />
-            <feGaussianBlur in="frosted" stdDeviation="0.5" />
-          </filter>
-          {/* Glass surface reflection */}
           <linearGradient id="glass-reflection" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="white" stopOpacity="0.06" />
-            <stop offset="30%" stopColor="white" stopOpacity="0.02" />
-            <stop offset="70%" stopColor="white" stopOpacity="0" />
-            <stop offset="100%" stopColor="white" stopOpacity="0.03" />
+            <stop offset="0%" stopColor="white" stopOpacity="0.08" />
+            <stop offset="40%" stopColor="white" stopOpacity="0" />
+            <stop offset="100%" stopColor="white" stopOpacity="0.04" />
           </linearGradient>
-          {/* Neon grid glow */}
-          <filter id="grid-glow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="2" result="blur" />
+          {/* Grid line glow — subtle, not blurry */}
+          <filter id="grid-glow" x="-10%" y="-10%" width="120%" height="120%">
+            <feGaussianBlur stdDeviation="1" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          {/* Crystal piece inner glow */}
-          <filter id="crystal-glow" x="-30%" y="-30%" width="160%" height="160%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feFlood floodColor="rgba(100,180,255,0.3)" result="color" />
+          {/* Crystal piece glow — clean, not frosted */}
+          <filter id="crystal-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2" result="blur" />
+            <feFlood floodColor="rgba(100,160,255,0.2)" result="color" />
             <feComposite in="color" in2="blur" operator="in" result="glow" />
             <feMerge>
               <feMergeNode in="glow" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          <filter id="crystal-glow-red" x="-30%" y="-30%" width="160%" height="160%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feFlood floodColor="rgba(255,120,120,0.3)" result="color" />
+          <filter id="crystal-glow-red" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2" result="blur" />
+            <feFlood floodColor="rgba(255,100,100,0.2)" result="color" />
             <feComposite in="color" in2="blur" operator="in" result="glow" />
             <feMerge>
               <feMergeNode in="glow" />
@@ -455,16 +433,16 @@ export const BoardView: React.FC<BoardViewProps> = ({
         <stop offset="100%" stopColor={t.pieceGradBlack[2]} />
       </radialGradient>
 
-      {/* Piece bevel highlight */}
+      {/* Piece bevel highlight — clear, not frosted */}
       <radialGradient id="piece-highlight" cx="35%" cy="30%" r="50%">
-        <stop offset="0%" stopColor="white" stopOpacity={t.pieceStyle === 'crystal' ? '0.25' : '0.4'} />
+        <stop offset="0%" stopColor="white" stopOpacity="0.35" />
         <stop offset="100%" stopColor="white" stopOpacity="0" />
       </radialGradient>
 
-      {/* Jade piece special highlight — green tint refraction */}
+      {/* Jade refraction — subtle green light refraction on red jade pieces */}
       {t.pieceStyle === 'jade' && (
         <radialGradient id="jade-refraction" cx="55%" cy="60%" r="45%">
-          <stop offset="0%" stopColor="#90EE90" stopOpacity="0.12" />
+          <stop offset="0%" stopColor="#90EE90" stopOpacity="0.1" />
           <stop offset="100%" stopColor="#006400" stopOpacity="0" />
         </radialGradient>
       )}
@@ -473,8 +451,8 @@ export const BoardView: React.FC<BoardViewProps> = ({
       <filter id="piece-shadow" x="-20%" y="-10%" width="140%" height="150%">
         <feDropShadow dx={t.pieceStyle === 'crystal' ? '0' : '1.5'}
           dy={t.pieceStyle === 'crystal' ? '2' : '3'}
-          stdDeviation={t.pieceStyle === 'crystal' ? '4' : '2.5'}
-          floodColor={t.pieceStyle === 'crystal' ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.35)'} />
+          stdDeviation={t.pieceStyle === 'crystal' ? '3' : '2.5'}
+          floodColor={t.pieceStyle === 'crystal' ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.35)'} />
       </filter>
 
       {/* Board edge shadow */}
@@ -711,12 +689,12 @@ export const BoardView: React.FC<BoardViewProps> = ({
             <circle cx={0} cy={0} r={PIECE_R} fill="url(#jade-refraction)" />
           )}
 
-          {/* Crystal: inner frosted ring */}
+          {/* Crystal: clean inner ring, not frosted */}
           {t.pieceStyle === 'crystal' && (
             <circle cx={0} cy={0} r={PIECE_R - 2}
               fill="none"
-              stroke={isRed ? 'rgba(255,180,180,0.2)' : 'rgba(180,200,255,0.2)'}
-              strokeWidth={1} />
+              stroke={isRed ? 'rgba(255,160,160,0.35)' : 'rgba(160,190,255,0.35)'}
+              strokeWidth={1.2} />
           )}
 
           {/* Rim / inner ring */}
@@ -842,31 +820,25 @@ export const BoardView: React.FC<BoardViewProps> = ({
       <svg ref={svgRef} viewBox={`0 0 ${BOARD_W} ${BOARD_H}`} className="w-full h-auto" style={{ display: 'block' }}>
         {renderDefs()}
 
-        {/* Board background with 3D gradient + texture */}
+        {/* Board background with 3D gradient */}
         <rect x={0} y={0} width={BOARD_W} height={BOARD_H} rx={6} ry={6} fill="url(#board-bg)" filter="url(#board-shadow)" />
 
-        {/* Stone texture overlay */}
-        {t.boardTexture === 'stone' && (
-          <rect x={0} y={0} width={BOARD_W} height={BOARD_H} rx={6} ry={6}
-            fill="url(#board-bg)" filter="url(#stone-texture)" opacity={0.7} />
-        )}
+        {/* Stone: clean specular highlight overlay (no feTurbulence noise) */}
         {t.boardTexture === 'stone' && (
           <rect x={0} y={0} width={BOARD_W} height={BOARD_H} rx={6} ry={6}
             fill="url(#stone-specular)" />
         )}
 
-        {/* Glass frost overlay */}
+        {/* Glass: clean reflection line (no frosted blur) */}
         {t.boardTexture === 'glass' && (
           <>
             <rect x={0} y={0} width={BOARD_W} height={BOARD_H} rx={6} ry={6}
-              fill="url(#board-bg)" filter="url(#glass-frost)" opacity={0.5} />
-            <rect x={0} y={0} width={BOARD_W} height={BOARD_H} rx={6} ry={6}
               fill="url(#glass-reflection)" />
-            {/* Ambient glow spots for glass theme */}
-            <circle cx={BOARD_W * 0.25} cy={BOARD_H * 0.3} r={120}
-              fill="rgba(59,130,246,0.04)" />
-            <circle cx={BOARD_W * 0.75} cy={BOARD_H * 0.7} r={100}
-              fill="rgba(139,92,246,0.03)" />
+            {/* Subtle ambient glow spots */}
+            <circle cx={BOARD_W * 0.25} cy={BOARD_H * 0.3} r={100}
+              fill="rgba(59,130,246,0.03)" />
+            <circle cx={BOARD_W * 0.75} cy={BOARD_H * 0.7} r={80}
+              fill="rgba(139,92,246,0.02)" />
           </>
         )}
 
