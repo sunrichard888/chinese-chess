@@ -186,7 +186,6 @@ export const BoardView: React.FC<BoardViewProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
 
   // Animation state
-  const prevPiecesRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const [animatingPieces, setAnimatingPieces] = useState<Map<string, { fromX: number; fromY: number; toX: number; toY: number; progress: number }>>(new Map());
   const [captureParticles, setCaptureParticles] = useState<CaptureParticle[]>([]);
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
@@ -201,8 +200,6 @@ export const BoardView: React.FC<BoardViewProps> = ({
     const displayRank = flipBoard ? rank : (RANKS - 1 - rank);
     return PAD + displayRank * CELL;
   }, [flipBoard]);
-
-  const pieceIdKey = (color: string, type: string) => `${color}-${type}`;
 
   /* ── Announcement triggers ── */
   // Check announcement
@@ -260,67 +257,77 @@ export const BoardView: React.FC<BoardViewProps> = ({
   }, [announcement?.startTime]);
 
   /* ── Detect piece movements and trigger slide animations ── */
+  // Instead of tracking all pieces by unstable sort-order keys,
+  // use lastMove to identify exactly which piece moved and animate only that one.
+  const prevLastMoveRef = useRef<typeof lastMove>(null);
+
   useEffect(() => {
-    const currentPositions = new Map<string, { x: number; y: number }>();
-    const colorTypeCounts: Record<string, number> = {};
-    const sortedPieces = [...pieces].sort((a, b) => {
-      if (a.color !== b.color) return a.color < b.color ? -1 : 1;
-      if (a.type !== b.type) return a.type < b.type ? -1 : 1;
-      if (a.position.file !== b.position.file) return a.position.file - b.position.file;
-      return a.position.rank - b.position.rank;
-    });
-
-    for (const piece of sortedPieces) {
-      const baseKey = pieceIdKey(piece.color, piece.type);
-      colorTypeCounts[baseKey] = (colorTypeCounts[baseKey] || 0) + 1;
-      const stableKey = `${baseKey}-${colorTypeCounts[baseKey]}`;
-      currentPositions.set(stableKey, { x: toX(piece.position.file), y: toY(piece.position.rank) });
+    // Only animate when a new lastMove appears
+    if (!lastMove || lastMove === prevLastMoveRef.current) {
+      prevLastMoveRef.current = lastMove;
+      return;
     }
 
-    const prev = prevPiecesRef.current;
+    prevLastMoveRef.current = lastMove;
+
+    // Calculate from/to screen coordinates for the moved piece
+    const fromX = toX(lastMove.from.file);
+    const fromY = toY(lastMove.from.rank);
+    const toXPos = toX(lastMove.to.file);
+    const toYPos = toY(lastMove.to.rank);
+
+    // Skip if no actual movement on screen
+    if (fromX === toXPos && fromY === toYPos) return;
+
+    // Find the piece that is now at the destination (the piece that moved)
+    const movedPiece = pieces.find(
+      p => p.position.file === lastMove.to.file && p.position.rank === lastMove.to.rank
+    );
+    if (!movedPiece) return;
+
+    // Use a unique key for this specific piece at its destination
+    const animKey = `${movedPiece.color}-${movedPiece.type}-${lastMove.to.file}-${lastMove.to.rank}`;
+
     const newAnims = new Map<string, { fromX: number; fromY: number; toX: number; toY: number; progress: number }>();
-    let hasCaptureAt: { x: number; y: number } | null = null;
+    newAnims.set(animKey, { fromX, fromY, toX: toXPos, toY: toYPos, progress: 0 });
 
-    if (lastMove && prev.size > 0) {
-      for (const [key, curr] of currentPositions) {
-        const prevPos = prev.get(key);
-        if (prevPos && (prevPos.x !== curr.x || prevPos.y !== curr.y)) {
-          newAnims.set(key, { fromX: prevPos.x, fromY: prevPos.y, toX: curr.x, toY: curr.y, progress: 0 });
-        }
-      }
-      if (prev.size > currentPositions.size) {
-        hasCaptureAt = { x: toX(lastMove.to.file), y: toY(lastMove.to.rank) };
-      }
-    }
+    setAnimatingPieces(newAnims);
+    const startTime = performance.now();
+    const duration = ANIM_DURATION.move;
+    const animate = (now: number) => {
+      const raw = Math.min((now - startTime) / duration, 1);
+      const progress = easeOutCubic(raw);
+      setAnimatingPieces((prev) => {
+        const updated = new Map(prev);
+        for (const [k, v] of updated) updated.set(k, { ...v, progress });
+        return updated;
+      });
+      if (raw < 1) animFrameRef.current = requestAnimationFrame(animate);
+      else setAnimatingPieces(new Map());
+    };
+    cancelAnimationFrame(animFrameRef.current);
+    animFrameRef.current = requestAnimationFrame(animate);
 
-    if (newAnims.size > 0) {
-      setAnimatingPieces(newAnims);
-      const startTime = performance.now();
-      const duration = ANIM_DURATION.move;
-      const animate = (now: number) => {
-        const raw = Math.min((now - startTime) / duration, 1);
-        const progress = easeOutCubic(raw);
-        setAnimatingPieces((prev) => {
-          const updated = new Map(prev);
-          for (const [k, v] of updated) updated.set(k, { ...v, progress });
-          return updated;
-        });
-        if (raw < 1) animFrameRef.current = requestAnimationFrame(animate);
-        else setAnimatingPieces(new Map());
-      };
-      cancelAnimationFrame(animFrameRef.current);
-      animFrameRef.current = requestAnimationFrame(animate);
-    }
+    return () => cancelAnimationFrame(animFrameRef.current);
+  }, [lastMove, pieces, toX, toY]);
 
-    // Capture particles
-    if (hasCaptureAt) {
+  // Separate capture particle effect tracking
+  const prevPieceCountRef = useRef(pieces.length);
+  useEffect(() => {
+    const prevCount = prevPieceCountRef.current;
+    prevPieceCountRef.current = pieces.length;
+
+    if (lastMove && prevCount > pieces.length) {
+      // A capture occurred
+      const cx = toX(lastMove.to.file);
+      const cy = toY(lastMove.to.rank);
       const colors = ['#EF4444', '#F97316', '#FBBF24', '#F59E0B', '#DC2626', '#FF6B6B'];
       const now = performance.now();
       const newP: CaptureParticle[] = [];
       for (let i = 0; i < 14; i++) {
         newP.push({
           id: particleIdRef.current++,
-          x: hasCaptureAt.x, y: hasCaptureAt.y,
+          x: cx, y: cy,
           angle: (Math.PI * 2 * i) / 14 + (Math.random() - 0.5) * 0.5,
           speed: 35 + Math.random() * 65,
           size: 2.5 + Math.random() * 4,
@@ -340,13 +347,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
       };
       requestAnimationFrame(animP);
     }
-
-    const nextPrev = new Map<string, { x: number; y: number }>();
-    for (const [k, v] of currentPositions) nextPrev.set(k, { x: v.x, y: v.y });
-    prevPiecesRef.current = nextPrev;
-
-    return () => cancelAnimationFrame(animFrameRef.current);
-  }, [pieces, lastMove, toX, toY]);
+  }, [pieces.length, lastMove, toX, toY]);
 
   const handleClick = (file: number, rank: number) => {
     onPositionSelect?.({ file, rank });
@@ -621,23 +622,15 @@ export const BoardView: React.FC<BoardViewProps> = ({
   /* ══════════════════ 3D Pieces ══════════════════════════════ */
 
   const renderPieces = () => {
-    const colorTypeCounts: Record<string, number> = {};
-    const sortedPieces = [...pieces].sort((a, b) => {
-      if (a.color !== b.color) return a.color < b.color ? -1 : 1;
-      if (a.type !== b.type) return a.type < b.type ? -1 : 1;
-      if (a.position.file !== b.position.file) return a.position.file - b.position.file;
-      return a.position.rank - b.position.rank;
-    });
-
-    return sortedPieces.map((piece) => {
-      const baseKey = pieceIdKey(piece.color, piece.type);
-      colorTypeCounts[baseKey] = (colorTypeCounts[baseKey] || 0) + 1;
-      const stableKey = `${baseKey}-${colorTypeCounts[baseKey]}`;
+    return pieces.map((piece) => {
+      // Unique key per piece based on its CURRENT position (stable, no sort-order ambiguity)
+      const pieceKey = `${piece.color}-${piece.type}-${piece.position.file}-${piece.position.rank}`;
 
       let cx = toX(piece.position.file);
       let cy = toY(piece.position.rank);
 
-      const anim = animatingPieces.get(stableKey);
+      // Check if this specific piece is being animated
+      const anim = animatingPieces.get(pieceKey);
       if (anim) {
         cx = anim.fromX + (anim.toX - anim.fromX) * anim.progress;
         cy = anim.fromY + (anim.toY - anim.fromY) * anim.progress;
@@ -659,7 +652,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
       }
 
       return (
-        <g key={stableKey} transform={`translate(${cx}, ${cy})${scaleStr}`} style={{ cursor: 'pointer' }} filter={pieceFilter}>
+        <g key={pieceKey} transform={`translate(${cx}, ${cy})${scaleStr}`} style={{ cursor: 'pointer' }} filter={pieceFilter}>
           {/* 3D base — varies by style */}
           {t.pieceStyle === 'crystal' ? (
             /* Glass/Crystal: soft glow ring underneath */
