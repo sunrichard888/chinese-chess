@@ -2,9 +2,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { BoardView } from './ui/BoardView';
 import { useGameStore } from './app/game-store';
 import { getBestMove, Difficulty } from './ai/engine';
+import { getEngine, DIFFICULTY_CONFIGS, EngineStatus } from './ai/fairy-stockfish';
 import { Color } from './core/types';
 import { evaluateGameStatus } from './core/rules';
 import { VolumeControl } from './ui/VolumeControl';
+
+type DifficultyLevel = 'beginner' | 'easy' | 'medium' | 'hard' | 'master';
 
 function App() {
   const {
@@ -13,12 +16,10 @@ function App() {
     validMoves,
     lastMove,
     inCheck,
-    difficulty,
     gameMode,
     selectPosition,
     makeMove,
     resetGame,
-    setDifficulty,
     setGameMode,
     initializeAudio,
     undo,
@@ -30,12 +31,26 @@ function App() {
   const [gameOver, setGameOver] = useState(false);
   const [winner, setWinner] = useState<Color | null>(null);
   const [statusText, setStatusText] = useState('');
+  const [aiDifficulty, setAiDifficulty] = useState<DifficultyLevel>('medium');
+  const [engineStatus, setEngineStatus] = useState<EngineStatus>('loading');
+  const [aiThinking, setAiThinking] = useState(false);
   const aiRunning = useRef(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => { initializeAudio(); }, [initializeAudio]);
 
-  /* ── Enhanced audio: synthesize check/checkmate sounds ── */
+  /* ── Initialize Fairy-Stockfish engine ── */
+  useEffect(() => {
+    const engine = getEngine();
+    const unsub = engine.onStatus((s) => setEngineStatus(s));
+    engine.waitReady().then((ok) => {
+      if (ok) setEngineStatus('ready');
+      else setEngineStatus('error');
+    });
+    return unsub;
+  }, []);
+
+  /* ── Enhanced audio ── */
   const getAudioCtx = useCallback(() => {
     if (!audioCtxRef.current) {
       try {
@@ -48,7 +63,6 @@ function App() {
   const playCheckSound = useCallback(() => {
     const ctx = getAudioCtx();
     if (!ctx) return;
-    // Dramatic two-tone alert
     [660, 880].forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -66,7 +80,6 @@ function App() {
   const playCheckmateSound = useCallback(() => {
     const ctx = getAudioCtx();
     if (!ctx) return;
-    // Epic descending chord
     const freqs = [880, 660, 440, 330, 220];
     freqs.forEach((freq, i) => {
       const osc = ctx.createOscillator();
@@ -80,8 +93,6 @@ function App() {
       osc.start(ctx.currentTime + i * 0.12);
       osc.stop(ctx.currentTime + i * 0.12 + 0.5);
     });
-
-    // Speech announcement after sound effect
     setTimeout(() => {
       if ('speechSynthesis' in window) {
         const u = new SpeechSynthesisUtterance('绝杀');
@@ -100,7 +111,6 @@ function App() {
     if (status.status === 'checkmate' || status.status === 'stalemate' || status.status === 'draw') {
       setGameOver(true);
       setWinner(status.winner || null);
-
       const msg =
         status.status === 'checkmate'
           ? `绝杀！${status.winner === Color.Red ? '红方' : '黑方'}获胜！`
@@ -108,10 +118,7 @@ function App() {
           ? '和棋！无子可动'
           : '和棋！';
       setStatusText(msg);
-
-      if (status.status === 'checkmate') {
-        playCheckmateSound();
-      }
+      if (status.status === 'checkmate') playCheckmateSound();
     } else if (status.status === 'check') {
       const checkMsg = gameState.board.turn === Color.Red ? '红方被将军！' : '黑方被将军！';
       setStatusText(checkMsg);
@@ -121,7 +128,7 @@ function App() {
     }
   }, [gameState, playCheckSound, playCheckmateSound]);
 
-  /* ── AI move ── */
+  /* ── AI move (Fairy-Stockfish primary, fallback to built-in engine) ── */
   useEffect(() => {
     if (gameMode !== 'pvai') return;
     if (gameOver) return;
@@ -132,18 +139,32 @@ function App() {
     if (status.status === 'checkmate' || status.status === 'stalemate' || status.status === 'draw') return;
 
     aiRunning.current = true;
+    setAiThinking(true);
 
-    const timer = setTimeout(() => {
+    const config = DIFFICULTY_CONFIGS[aiDifficulty] || DIFFICULTY_CONFIGS.medium;
+
+    const doMove = async () => {
       try {
-        const diffConfig: Difficulty =
-          difficulty === 'easy' ? Difficulty.Easy :
-          difficulty === 'hard' ? Difficulty.Hard :
-          Difficulty.Medium;
+        let move = null;
 
-        const result = getBestMove(gameState.board, diffConfig, Color.Black);
+        // Try Fairy-Stockfish first
+        if (engineStatus === 'ready') {
+          const engine = getEngine();
+          move = await engine.getBestMove(gameState.board, config);
+        }
 
-        if (result.move?.from && result.move?.to) {
-          makeMove(result.move.from, result.move.to);
+        // Fallback to built-in engine if WASM failed
+        if (!move) {
+          const fallbackDiff =
+            aiDifficulty === 'beginner' || aiDifficulty === 'easy' ? Difficulty.Easy :
+            aiDifficulty === 'hard' || aiDifficulty === 'master' ? Difficulty.Hard :
+            Difficulty.Medium;
+          const result = getBestMove(gameState.board, fallbackDiff, Color.Black);
+          move = result.move;
+        }
+
+        if (move?.from && move?.to) {
+          makeMove(move.from, move.to);
         } else {
           const s = evaluateGameStatus(gameState.board);
           if (s.status === 'checkmate' || s.status === 'stalemate') {
@@ -158,16 +179,19 @@ function App() {
         }
       } finally {
         aiRunning.current = false;
+        setAiThinking(false);
       }
-    }, 400);
+    };
 
-    return () => { clearTimeout(timer); aiRunning.current = false; };
-  }, [gameState.board.turn, gameMode, gameOver, difficulty, gameState.board, makeMove]);
+    // Small delay so user sees their move before AI responds
+    const timer = setTimeout(doMove, 300);
+    return () => { clearTimeout(timer); aiRunning.current = false; setAiThinking(false); };
+  }, [gameState.board.turn, gameMode, gameOver, aiDifficulty, engineStatus, gameState.board, makeMove]);
 
   /* ── click handler ── */
   const handlePositionSelect = useCallback(
     (position: { file: number; rank: number } | null) => {
-      if (gameOver) return;
+      if (gameOver || aiThinking) return;
       if (!position) { selectPosition(null); return; }
 
       const state = useGameStore.getState();
@@ -177,7 +201,7 @@ function App() {
       }
       selectPosition(position);
     },
-    [selectPosition, makeMove, gameOver],
+    [selectPosition, makeMove, gameOver, aiThinking],
   );
 
   const handleReset = () => {
@@ -186,6 +210,17 @@ function App() {
     setWinner(null);
     setStatusText('');
     aiRunning.current = false;
+    setAiThinking(false);
+  };
+
+  /* ── Engine status indicator ── */
+  const engineStatusLabel = () => {
+    switch (engineStatus) {
+      case 'loading': return '⏳ 引擎加载中...';
+      case 'ready': return '✅ Fairy-Stockfish';
+      case 'thinking': return '🤔 思考中...';
+      case 'error': return '⚠️ 使用内置引擎';
+    }
   };
 
   /* ── UI ── */
@@ -200,6 +235,9 @@ function App() {
       <div className="w-full max-w-xl mb-3 px-4 py-2 bg-white rounded-lg shadow flex items-center justify-between">
         <span className="font-semibold">
           {gameState.board.turn === Color.Red ? '🔴 红方走棋' : '⚫ 黑方走棋'}
+          {aiThinking && gameState.board.turn === Color.Black && (
+            <span className="ml-2 text-xs text-blue-500 animate-pulse">思考中...</span>
+          )}
         </span>
         {statusText && (
           <span className={`font-bold text-sm px-3 py-1 rounded ${
@@ -215,7 +253,7 @@ function App() {
         </span>
       </div>
 
-      {/* Board — announcement overlay renders INSIDE the SVG, no modal */}
+      {/* Board */}
       <div className="w-full max-w-xl bg-white p-4 rounded-lg shadow-lg">
         <BoardView
           pieces={gameState.board.pieces}
@@ -233,11 +271,11 @@ function App() {
 
       {/* Controls */}
       <div className="w-full max-w-xl mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <button onClick={() => undo()} disabled={gameOver}
+        <button onClick={() => undo()} disabled={gameOver || aiThinking}
           className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 text-sm font-medium">
           ↶ 悔棋
         </button>
-        <button onClick={() => redo()} disabled={gameOver}
+        <button onClick={() => redo()} disabled={gameOver || aiThinking}
           className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40 text-sm font-medium">
           ↷ 重做
         </button>
@@ -264,25 +302,32 @@ function App() {
         <select value={gameMode}
           onChange={(e) => { setGameMode(e.target.value as 'pvp' | 'pvai' | 'aivai'); handleReset(); }}
           className="px-3 py-1.5 border rounded-lg bg-white"
-          disabled={!gameOver && gameState.board.moveHistory.length > 0}>
+          disabled={(!gameOver && gameState.board.moveHistory.length > 0) || aiThinking}>
           <option value="pvai">🤖 人机对战</option>
           <option value="pvp">👥 双人对战</option>
           <option value="aivai">🤖🤖 AI 对战</option>
         </select>
 
-        <select value={difficulty}
-          onChange={(e) => setDifficulty(e.target.value as 'easy' | 'medium' | 'hard')}
+        <select value={aiDifficulty}
+          onChange={(e) => setAiDifficulty(e.target.value as DifficultyLevel)}
           className="px-3 py-1.5 border rounded-lg bg-white"
-          disabled={gameMode !== 'pvai'}>
-          <option value="easy">简单</option>
-          <option value="medium">中等</option>
-          <option value="hard">困难</option>
+          disabled={gameMode !== 'pvai' || aiThinking}>
+          <option value="beginner">🟢 入门</option>
+          <option value="easy">🟡 初级</option>
+          <option value="medium">🟠 中级</option>
+          <option value="hard">🔴 高级</option>
+          <option value="master">⚫ 大师</option>
         </select>
 
         <VolumeControl />
       </div>
 
-      {/* Game over — simple bottom bar instead of modal */}
+      {/* Engine status */}
+      <div className="w-full max-w-xl mt-1 text-xs text-center text-amber-600">
+        {engineStatusLabel()}
+      </div>
+
+      {/* Game over */}
       {gameOver && (
         <div className="w-full max-w-xl mt-3 p-4 bg-white rounded-lg shadow-lg text-center">
           <p className="text-lg font-bold text-amber-900 mb-2">{statusText}</p>
@@ -299,7 +344,7 @@ function App() {
       )}
 
       <footer className="mt-6 text-center text-amber-600 text-xs">
-        Built with React + TypeScript + Tailwind CSS
+        Built with React + TypeScript + Tailwind CSS + Fairy-Stockfish
       </footer>
     </div>
   );
