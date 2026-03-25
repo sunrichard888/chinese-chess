@@ -181,6 +181,8 @@ function App() {
           validMoves={validMoves}
           lastMove={lastMove}
           inCheck={inCheck}
+          isCheckmate={gameOver && message.includes('绝杀')}
+          checkmateWinner={winner}
           onPositionSelect={handlePositionSelect}
           flipBoard={flipBoard}
           theme={boardTheme}
