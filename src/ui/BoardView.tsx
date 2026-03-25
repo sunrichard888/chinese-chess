@@ -111,20 +111,20 @@ const themes: Record<string, ThemeColors> = {
   },
   glass: {
     id: 'glass',
-    bg: '#141E30',
-    bgGradient: ['#1C2A3F', '#0D1520'],
-    gridLine: '#5A8ABF',
+    bg: '#2A3A50',
+    bgGradient: ['#354A60', '#253545'],
+    gridLine: '#6A9AC4',
     gridLineWidth: 1.2,
-    river: '#1A2A40',
-    riverText: '#7AADD4',
-    pieceStroke: '#4A7AAA',
-    // Crystal-clear pieces — solid enough to be readable
-    pieceGradRed: ['#FFD0D0', '#E06060', '#A03030'],
-    pieceGradBlack: ['#D0DFFF', '#6090D0', '#3060A0'],
-    pieceTextRed: '#FFE0E0',
-    pieceTextBlack: '#E0EDFF',
-    boardBorder: '#4A7AAA',
-    boardShadow: '#050A10',
+    river: '#304050',
+    riverText: '#8ABDE0',
+    pieceStroke: '#5A8AB5',
+    // Crystal pieces — solid, high contrast
+    pieceGradRed: ['#FFDDDD', '#E87070', '#B04040'],
+    pieceGradBlack: ['#DDEAFF', '#70A0E0', '#4070B0'],
+    pieceTextRed: '#FFFFFF',
+    pieceTextBlack: '#FFFFFF',
+    boardBorder: '#5A8AB5',
+    boardShadow: '#101820',
     boardTexture: 'glass',
     pieceStyle: 'crystal',
   },
@@ -681,8 +681,10 @@ export const BoardView: React.FC<BoardViewProps> = ({
             stroke={t.pieceStroke}
             strokeWidth={t.pieceStyle === 'crystal' ? 0.8 : 1.5} />
 
-          {/* Highlight overlay for 3D convexity */}
-          <circle cx={0} cy={0} r={PIECE_R} fill="url(#piece-highlight)" />
+          {/* Highlight overlay — skip for crystal to avoid washing out text */}
+          {t.pieceStyle !== 'crystal' && (
+            <circle cx={0} cy={0} r={PIECE_R} fill="url(#piece-highlight)" />
+          )}
 
           {/* Jade refraction overlay */}
           {t.pieceStyle === 'jade' && isRed && (
@@ -703,12 +705,26 @@ export const BoardView: React.FC<BoardViewProps> = ({
             strokeWidth={t.pieceStyle === 'crystal' ? 0.5 : 0.8}
             opacity={t.pieceStyle === 'crystal' ? 0.3 : 0.4} />
 
-          {/* Character */}
+          {/* Character — 3D engraved text effect:
+              1. Dark shadow text offset down-right (carved depth)
+              2. Light highlight text offset up-left (light catching edge)
+              3. Main text on top */}
+          <text x={0.8} y={FONT_SIZE * 0.35 + 0.3} textAnchor="middle"
+            fill="rgba(0,0,0,0.4)"
+            fontSize={FONT_SIZE} fontFamily="KaiTi, STKaiti, SimSun, serif" fontWeight="bold"
+            style={{ userSelect: 'none' }}>
+            {label}
+          </text>
+          <text x={-0.4} y={FONT_SIZE * 0.35 - 1} textAnchor="middle"
+            fill={t.pieceStyle === 'crystal' ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.25)'}
+            fontSize={FONT_SIZE} fontFamily="KaiTi, STKaiti, SimSun, serif" fontWeight="bold"
+            style={{ userSelect: 'none' }}>
+            {label}
+          </text>
           <text x={0} y={FONT_SIZE * 0.35 - 0.5} textAnchor="middle"
             fill={isRed ? t.pieceTextRed : t.pieceTextBlack}
             fontSize={FONT_SIZE} fontFamily="KaiTi, STKaiti, SimSun, serif" fontWeight="bold"
-            style={{ userSelect: 'none' }}
-            stroke={isRed ? 'rgba(180,0,0,0.15)' : 'rgba(0,0,0,0.1)'} strokeWidth={0.5}>
+            style={{ userSelect: 'none' }}>
             {label}
           </text>
         </g>
