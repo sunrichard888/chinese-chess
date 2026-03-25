@@ -1,13 +1,17 @@
 /**
- * BoardView Component - Renders the Chinese Chess board
- * 
- * Uses SVG for crisp rendering at any size
- * Responsive design with mobile-first approach
+ * BoardView Component - Chinese Chess Board (Pure SVG)
+ *
+ * All elements (grid, decorations, pieces, indicators) are rendered inside
+ * a single SVG so alignment is pixel-perfect at any viewport size.
+ *
+ * Board: 9 files (0-8) × 10 ranks (0-9)
+ * Red at bottom (rank 0), Black at top (rank 9).
  */
 
 import React from 'react';
-import { Position, Piece } from '../core/types';
-import { PieceView } from './PieceView';
+import { Position, Piece, Color, PieceType } from '../core/types';
+
+/* ─────────────────────────── props ─────────────────────────── */
 
 interface BoardViewProps {
   pieces?: readonly Piece[];
@@ -17,20 +21,115 @@ interface BoardViewProps {
   inCheck?: Position | null;
   onPositionSelect?: (position: Position) => void;
   className?: string;
-  flipBoard?: boolean; // Flip board so Red is at bottom
-  theme?: 'classic' | 'modern' | 'green'; // Board theme
+  flipBoard?: boolean;
+  theme?: 'classic' | 'modern' | 'green';
 }
 
-// Board dimensions
-const FILES = 9;   // 0-8 (纵线)
-const RANKS = 10;  // 0-9 (横线)
-const CELL_SIZE = 100; // Base cell size in SVG units
-const PADDING = 50;    // Padding around the board
+/* ─────────────────────────── constants ─────────────────────── */
+
+const FILES = 9;
+const RANKS = 10;
+const CELL = 60;          // cell size in SVG units
+const PAD = 40;            // padding around grid
+const PIECE_R = 25;        // piece circle radius
+const FONT_SIZE = 28;      // piece character font size
+
+const BOARD_W = (FILES - 1) * CELL + PAD * 2;
+const BOARD_H = (RANKS - 1) * CELL + PAD * 2;
+
+/* ─────────────────────────── themes ───────────────────────── */
+
+interface ThemeColors {
+  bg: string;
+  gridLine: string;
+  gridLineWidth: number;
+  river: string;
+  riverText: string;
+  pieceStroke: string;
+  pieceFillRed: string;
+  pieceFillBlack: string;
+  pieceTextRed: string;
+  pieceTextBlack: string;
+  boardBorder: string;
+  cellBg: string;
+}
+
+const themes: Record<string, ThemeColors> = {
+  classic: {
+    bg: '#F0D9B5',
+    gridLine: '#5C3317',
+    gridLineWidth: 1.5,
+    river: '#E8C98E',
+    riverText: '#5C3317',
+    pieceStroke: '#5C3317',
+    pieceFillRed: '#FFF5E6',
+    pieceFillBlack: '#FFF5E6',
+    pieceTextRed: '#CC0000',
+    pieceTextBlack: '#1A1A1A',
+    boardBorder: '#5C3317',
+    cellBg: '#DFC08A',
+  },
+  modern: {
+    bg: '#1A1A2E',
+    gridLine: '#E94560',
+    gridLineWidth: 1.2,
+    river: '#0F3460',
+    riverText: '#E94560',
+    pieceStroke: '#E94560',
+    pieceFillRed: '#2D2D44',
+    pieceFillBlack: '#2D2D44',
+    pieceTextRed: '#FF6B81',
+    pieceTextBlack: '#E0E0E0',
+    boardBorder: '#E94560',
+    cellBg: '#16213E',
+  },
+  green: {
+    bg: '#2E6B2E',
+    gridLine: '#1A3D1A',
+    gridLineWidth: 1.5,
+    river: '#3D8B3D',
+    riverText: '#1A3D1A',
+    pieceStroke: '#1A3D1A',
+    pieceFillRed: '#E8F0E8',
+    pieceFillBlack: '#E8F0E8',
+    pieceTextRed: '#CC0000',
+    pieceTextBlack: '#1A1A1A',
+    boardBorder: '#1A3D1A',
+    cellBg: '#4A7C23',
+  },
+};
+
+/* ─────────────────────── piece labels ─────────────────────── */
+
+const PIECE_LABELS: Record<PieceType, { red: string; black: string }> = {
+  general:  { red: '帥', black: '將' },
+  advisor:  { red: '仕', black: '士' },
+  elephant: { red: '相', black: '象' },
+  horse:    { red: '馬', black: '馬' },
+  chariot:  { red: '車', black: '車' },
+  cannon:   { red: '炮', black: '砲' },
+  soldier:  { red: '兵', black: '卒' },
+};
+
+/* ────────────────────── cross / star marks ─────────────────── */
+// Positions that have the small cross marks on a standard Chinese chess board
+const CROSS_MARKS: Position[] = [
+  // Soldiers
+  { file: 0, rank: 3 }, { file: 2, rank: 3 }, { file: 4, rank: 3 },
+  { file: 6, rank: 3 }, { file: 8, rank: 3 },
+  { file: 0, rank: 6 }, { file: 2, rank: 6 }, { file: 4, rank: 6 },
+  { file: 6, rank: 6 }, { file: 8, rank: 6 },
+  // Cannons
+  { file: 1, rank: 2 }, { file: 7, rank: 2 },
+  { file: 1, rank: 7 }, { file: 7, rank: 7 },
+];
+
+/* ═══════════════════════ component ════════════════════════════ */
 
 export const BoardView: React.FC<BoardViewProps> = ({
   pieces = [],
   selectedPosition,
-  validMoves,
+  validMoves = [],
   lastMove,
   inCheck,
   onPositionSelect,
@@ -38,367 +137,360 @@ export const BoardView: React.FC<BoardViewProps> = ({
   flipBoard = false,
   theme = 'classic',
 }) => {
-  const width = (FILES - 1) * CELL_SIZE + PADDING * 2;
-  const height = (RANKS - 1) * CELL_SIZE + PADDING * 2;
+  const t = themes[theme] ?? themes.classic;
 
-  // River (between rank 4 and 5)
-  const riverY = PADDING + 4 * CELL_SIZE;
-  const riverHeight = CELL_SIZE;
-
-  // Theme colors
-  const themeColors = {
-    classic: {
-      background: 'linear-gradient(to bottom, #f59e0b 0%, #d97706 100%)',
-      grid: '#78350f',
-      river: '#fcd34d',
-    },
-    modern: {
-      background: 'linear-gradient(to bottom, #1a1a2e 0%, #16213e 100%)',
-      grid: '#e94560',
-      river: '#0f3460',
-    },
-    green: {
-      background: 'linear-gradient(to bottom, #2d5016 0%, #1a3009 100%)',
-      grid: '#4a7c23',
-      river: '#3d6b1c',
-    },
+  /* ── coordinate helpers ── */
+  // Convert logical (file, rank) → SVG (x, y).
+  // In the data model: Red starts at rank 0, Black at rank 9.
+  // On screen we want Red at the bottom by default.
+  // Rank 0 should be at the BOTTOM of the SVG (large y), rank 9 at the TOP.
+  // When flipBoard is true, Red goes to top (small y).
+  const toX = (file: number) => PAD + file * CELL;
+  const toY = (rank: number) => {
+    const displayRank = flipBoard ? rank : (RANKS - 1 - rank);
+    return PAD + displayRank * CELL;
   };
 
-  const colors = themeColors[theme];
-
-  // Helper to flip rank for display
-  const getDisplayRank = (rank: number): number => {
-    return flipBoard ? (RANKS - 1 - rank) : rank;
+  const handleClick = (file: number, rank: number) => {
+    onPositionSelect?.({ file, rank });
   };
 
-  // Handle click on a board position
-  const handlePositionClick = (file: number, rank: number) => {
-    // Convert display rank to logical rank
-    const logicalRank = flipBoard ? (RANKS - 1 - rank) : rank;
-    onPositionSelect?.({ file, rank: logicalRank });
+  /* ── render helpers ── */
+
+  const renderGrid = () => {
+    const lines: React.ReactNode[] = [];
+
+    // Horizontal lines (10 lines for 10 ranks, but mapped to display coords)
+    for (let displayRank = 0; displayRank < RANKS; displayRank++) {
+      const y = PAD + displayRank * CELL;
+      lines.push(
+        <line
+          key={`h-${displayRank}`}
+          x1={PAD} y1={y}
+          x2={PAD + (FILES - 1) * CELL} y2={y}
+          stroke={t.gridLine} strokeWidth={t.gridLineWidth}
+        />
+      );
+    }
+
+    // Vertical lines — first & last span the full board, middle ones split at river
+    for (let file = 0; file < FILES; file++) {
+      const x = PAD + file * CELL;
+      if (file === 0 || file === FILES - 1) {
+        lines.push(
+          <line
+            key={`v-${file}`}
+            x1={x} y1={PAD}
+            x2={x} y2={PAD + (RANKS - 1) * CELL}
+            stroke={t.gridLine} strokeWidth={t.gridLineWidth}
+          />
+        );
+      } else {
+        // Top half (display ranks 0-4)
+        lines.push(
+          <line
+            key={`vt-${file}`}
+            x1={x} y1={PAD}
+            x2={x} y2={PAD + 4 * CELL}
+            stroke={t.gridLine} strokeWidth={t.gridLineWidth}
+          />
+        );
+        // Bottom half (display ranks 5-9)
+        lines.push(
+          <line
+            key={`vb-${file}`}
+            x1={x} y1={PAD + 5 * CELL}
+            x2={x} y2={PAD + (RANKS - 1) * CELL}
+            stroke={t.gridLine} strokeWidth={t.gridLineWidth}
+          />
+        );
+      }
+    }
+
+    return lines;
   };
+
+  const renderPalaceDiagonals = () => {
+    // Palace: files 3-5.
+    // In standard orientation (Red bottom): top palace display ranks 0-2, bottom palace 7-9.
+    // We just draw them at fixed display positions since the grid is symmetric.
+    return (
+      <>
+        {/* Top palace */}
+        <line x1={PAD + 3 * CELL} y1={PAD} x2={PAD + 5 * CELL} y2={PAD + 2 * CELL}
+              stroke={t.gridLine} strokeWidth={t.gridLineWidth} />
+        <line x1={PAD + 5 * CELL} y1={PAD} x2={PAD + 3 * CELL} y2={PAD + 2 * CELL}
+              stroke={t.gridLine} strokeWidth={t.gridLineWidth} />
+        {/* Bottom palace */}
+        <line x1={PAD + 3 * CELL} y1={PAD + 7 * CELL} x2={PAD + 5 * CELL} y2={PAD + 9 * CELL}
+              stroke={t.gridLine} strokeWidth={t.gridLineWidth} />
+        <line x1={PAD + 5 * CELL} y1={PAD + 7 * CELL} x2={PAD + 3 * CELL} y2={PAD + 9 * CELL}
+              stroke={t.gridLine} strokeWidth={t.gridLineWidth} />
+      </>
+    );
+  };
+
+  const renderRiver = () => {
+    const y = PAD + 4 * CELL;
+    const h = CELL;
+    // Determine which text goes where based on flip
+    // Standard: Black side (top), Red side (bottom)
+    // Top half of river → Black → 楚 河, Bottom half → Red → 漢 界
+    // If flipped, swap.
+    const topText = flipBoard ? '漢　　界' : '楚　　河';
+    const bottomText = flipBoard ? '楚　　河' : '漢　　界';
+    return (
+      <>
+        <rect x={PAD} y={y} width={(FILES - 1) * CELL} height={h}
+              fill={t.river} opacity={0.5} />
+        <text x={PAD + (FILES - 1) * CELL * 0.25} y={y + h / 2 + 8}
+              textAnchor="middle" fill={t.riverText}
+              fontSize={20} fontFamily="KaiTi, STKaiti, serif"
+              fontWeight="bold" letterSpacing={6}>
+          {topText}
+        </text>
+        <text x={PAD + (FILES - 1) * CELL * 0.75} y={y + h / 2 + 8}
+              textAnchor="middle" fill={t.riverText}
+              fontSize={20} fontFamily="KaiTi, STKaiti, serif"
+              fontWeight="bold" letterSpacing={6}>
+          {bottomText}
+        </text>
+      </>
+    );
+  };
+
+  const renderCrossMarks = () => {
+    const arm = 6; // length of each arm
+    const gap = 4; // gap from center
+    const elems: React.ReactNode[] = [];
+
+    CROSS_MARKS.forEach((pos) => {
+      const cx = toX(pos.file);
+      const cy = toY(pos.rank);
+      const key = `cross-${pos.file}-${pos.rank}`;
+
+      // 4 corners of the cross, skip arms that would go outside the board
+      const arms: [number, number][] = [];
+      if (pos.file > 0) {
+        arms.push([-1, -1], [-1, 1]); // left-top, left-bottom
+      }
+      if (pos.file < 8) {
+        arms.push([1, -1], [1, 1]); // right-top, right-bottom
+      }
+
+      arms.forEach(([dx, dy], i) => {
+        // Horizontal part
+        elems.push(
+          <line key={`${key}-h-${i}`}
+            x1={cx + dx * gap} y1={cy + dy * gap}
+            x2={cx + dx * (gap + arm)} y2={cy + dy * gap}
+            stroke={t.gridLine} strokeWidth={1} />
+        );
+        // Vertical part
+        elems.push(
+          <line key={`${key}-v-${i}`}
+            x1={cx + dx * gap} y1={cy + dy * gap}
+            x2={cx + dx * gap} y2={cy + dy * (gap + arm)}
+            stroke={t.gridLine} strokeWidth={1} />
+        );
+      });
+    });
+
+    return elems;
+  };
+
+  const renderLastMoveHighlight = () => {
+    if (!lastMove) return null;
+    const rects = [lastMove.from, lastMove.to].map((pos, i) => {
+      const cx = toX(pos.file);
+      const cy = toY(pos.rank);
+      const size = CELL * 0.8;
+      return (
+        <rect key={`lm-${i}`}
+          x={cx - size / 2} y={cy - size / 2}
+          width={size} height={size}
+          rx={4} ry={4}
+          fill="#3B82F6" opacity={0.25}
+        />
+      );
+    });
+    return <>{rects}</>;
+  };
+
+  const renderSelectedHighlight = () => {
+    if (!selectedPosition) return null;
+    const cx = toX(selectedPosition.file);
+    const cy = toY(selectedPosition.rank);
+    const size = CELL * 0.85;
+    return (
+      <rect
+        x={cx - size / 2} y={cy - size / 2}
+        width={size} height={size}
+        rx={4} ry={4}
+        fill="#22C55E" opacity={0.35}
+        data-testid="selected-position"
+      />
+    );
+  };
+
+  const renderValidMoves = () =>
+    validMoves.map((pos, i) => {
+      const cx = toX(pos.file);
+      const cy = toY(pos.rank);
+      // Check if there is an enemy piece here (capture indicator)
+      const isCapture = pieces.some(
+        (p) => p.position.file === pos.file && p.position.rank === pos.rank
+      );
+      if (isCapture) {
+        // Ring indicator for captures
+        return (
+          <circle key={`vm-${i}`}
+            cx={cx} cy={cy} r={PIECE_R + 2}
+            fill="none" stroke="#EF4444" strokeWidth={3}
+            opacity={0.7}
+            data-testid="valid-move-indicator"
+          />
+        );
+      }
+      // Dot indicator for empty squares
+      return (
+        <circle key={`vm-${i}`}
+          cx={cx} cy={cy} r={7}
+          fill="#22C55E" opacity={0.7}
+          data-testid="valid-move-indicator"
+        />
+      );
+    });
+
+  const renderCheckIndicator = () => {
+    if (!inCheck) return null;
+    const cx = toX(inCheck.file);
+    const cy = toY(inCheck.rank);
+    return (
+      <>
+        <circle cx={cx} cy={cy} r={PIECE_R + 6}
+          fill="none" stroke="#EF4444" strokeWidth={3} opacity={0.8}>
+          <animate attributeName="r" values={`${PIECE_R + 4};${PIECE_R + 10};${PIECE_R + 4}`}
+            dur="1s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0.8;0.3;0.8"
+            dur="1s" repeatCount="indefinite" />
+        </circle>
+      </>
+    );
+  };
+
+  const renderPieces = () =>
+    pieces.map((piece) => {
+      const cx = toX(piece.position.file);
+      const cy = toY(piece.position.rank);
+      const label = PIECE_LABELS[piece.type][piece.color];
+      const isRed = piece.color === Color.Red;
+
+      return (
+        <g key={`piece-${piece.color}-${piece.type}-${piece.position.file}-${piece.position.rank}`}
+           style={{ cursor: 'pointer' }}
+           className="chess-piece">
+          {/* Outer shadow */}
+          <circle cx={cx + 1} cy={cy + 2} r={PIECE_R} fill="rgba(0,0,0,0.15)" />
+          {/* Piece background */}
+          <circle cx={cx} cy={cy} r={PIECE_R}
+            fill={isRed ? t.pieceFillRed : t.pieceFillBlack}
+            stroke={t.pieceStroke} strokeWidth={2} />
+          {/* Inner ring */}
+          <circle cx={cx} cy={cy} r={PIECE_R - 4}
+            fill="none"
+            stroke={isRed ? t.pieceTextRed : t.pieceTextBlack}
+            strokeWidth={1} opacity={0.5} />
+          {/* Character */}
+          <text x={cx} y={cy + FONT_SIZE * 0.35}
+            textAnchor="middle"
+            fill={isRed ? t.pieceTextRed : t.pieceTextBlack}
+            fontSize={FONT_SIZE}
+            fontFamily="KaiTi, STKaiti, SimSun, serif"
+            fontWeight="bold"
+            style={{ userSelect: 'none' }}>
+            {label}
+          </text>
+        </g>
+      );
+    });
+
+  const renderClickTargets = () => {
+    const targets: React.ReactNode[] = [];
+    for (let rank = 0; rank < RANKS; rank++) {
+      for (let file = 0; file < FILES; file++) {
+        const cx = toX(file);
+        const cy = toY(rank);
+        targets.push(
+          <circle
+            key={`click-${file}-${rank}`}
+            cx={cx} cy={cy}
+            r={PIECE_R + 2}
+            fill="transparent"
+            style={{ cursor: 'pointer' }}
+            role="button"
+            aria-label={`Position ${file},${rank}`}
+            onClick={(e) => { e.stopPropagation(); handleClick(file, rank); }}
+          />
+        );
+      }
+    }
+    return targets;
+  };
+
+  /* ── render ── */
 
   return (
     <div
       role="grid"
       aria-label="Chinese Chess Board"
-      className={`relative w-full max-w-2xl mx-auto aspect-[9/10] ${className}`}
-      style={{
-        background: colors.background,
-        borderRadius: '8px',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-        padding: '20px',
-      }}
+      className={`relative w-full max-w-xl mx-auto ${className}`}
     >
       <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="w-full h-full"
-        aria-hidden="true"
+        viewBox={`0 0 ${BOARD_W} ${BOARD_H}`}
+        className="w-full h-auto"
+        style={{ display: 'block' }}
       >
-        {/* Board background - wood texture color */}
-        <rect
-          x={0}
-          y={0}
-          width={width}
-          height={height}
-          fill="#fbbf24"
-          opacity="0.3"
-        />
+        {/* Board background */}
+        <rect x={0} y={0} width={BOARD_W} height={BOARD_H}
+          rx={6} ry={6} fill={t.bg} />
 
-        {/* Grid lines - horizontal */}
-        {Array.from({ length: RANKS }, (_, i) => (
-          <line
-            key={`h-${i}`}
-            x1={PADDING}
-            y1={PADDING + i * CELL_SIZE}
-            x2={PADDING + (FILES - 1) * CELL_SIZE}
-            y2={PADDING + i * CELL_SIZE}
-            stroke={colors.grid}
-            strokeWidth={2}
-          />
-        ))}
+        {/* Board border */}
+        <rect x={PAD - 4} y={PAD - 4}
+          width={(FILES - 1) * CELL + 8}
+          height={(RANKS - 1) * CELL + 8}
+          fill="none" stroke={t.boardBorder} strokeWidth={3} rx={2} ry={2} />
 
-        {/* Grid lines - vertical (split by river) */}
-        {Array.from({ length: FILES }, (_, i) => {
-          // First and last lines go all the way
-          if (i === 0 || i === FILES - 1) {
-            return (
-              <line
-                key={`v-${i}`}
-                x1={PADDING + i * CELL_SIZE}
-                y1={PADDING}
-                x2={PADDING + i * CELL_SIZE}
-                y2={PADDING + (RANKS - 1) * CELL_SIZE}
-                stroke={colors.grid}
-                strokeWidth={2}
-              />
-            );
-          }
-          // Middle lines split by river
-          return (
-            <g key={`v-${i}`}>
-              <line
-                x1={PADDING + i * CELL_SIZE}
-                y1={PADDING}
-                x2={PADDING + i * CELL_SIZE}
-                y2={riverY}
-                stroke={colors.grid}
-                strokeWidth={2}
-              />
-              <line
-                x1={PADDING + i * CELL_SIZE}
-                y1={riverY + riverHeight}
-                x2={PADDING + i * CELL_SIZE}
-                y2={PADDING + (RANKS - 1) * CELL_SIZE}
-                stroke={colors.grid}
-                strokeWidth={2}
-              />
-            </g>
-          );
-        })}
+        {/* Grid */}
+        {renderGrid()}
 
-        {/* River background */}
-        <rect
-          x={PADDING}
-          y={riverY}
-          width={(FILES - 1) * CELL_SIZE}
-          height={riverHeight}
-          fill={colors.river}
-          opacity="0.5"
-        />
+        {/* Palace diagonals */}
+        {renderPalaceDiagonals()}
 
-        {/* River text */}
-        <text
-          x={PADDING + (FILES - 1) * CELL_SIZE / 2}
-          y={riverY + CELL_SIZE / 2 + 8}
-          textAnchor="middle"
-          fill={colors.grid}
-          fontSize="24"
-          fontFamily="serif"
-          style={{ letterSpacing: '20px' }}
-        >
-          楚 河
-        </text>
-        <text
-          x={PADDING + (FILES - 1) * CELL_SIZE / 2 + 180}
-          y={riverY + CELL_SIZE / 2 + 8}
-          textAnchor="middle"
-          fill={colors.grid}
-          fontSize="24"
-          fontFamily="serif"
-          style={{ letterSpacing: '20px' }}
-        >
-          漢 界
-        </text>
+        {/* River */}
+        {renderRiver()}
 
-        {/* Palace diagonal lines (top - Black) */}
-        <line
-          x1={PADDING + 3 * CELL_SIZE}
-          y1={PADDING}
-          x2={PADDING + 5 * CELL_SIZE}
-          y2={PADDING + 2 * CELL_SIZE}
-          stroke={colors.grid}
-          strokeWidth={2}
-        />
-        <line
-          x1={PADDING + 5 * CELL_SIZE}
-          y1={PADDING}
-          x2={PADDING + 3 * CELL_SIZE}
-          y2={PADDING + 2 * CELL_SIZE}
-          stroke={colors.grid}
-          strokeWidth={2}
-        />
-
-        {/* Palace diagonal lines (bottom - Red) */}
-        <line
-          x1={PADDING + 3 * CELL_SIZE}
-          y1={PADDING + 7 * CELL_SIZE}
-          x2={PADDING + 5 * CELL_SIZE}
-          y2={PADDING + 9 * CELL_SIZE}
-          stroke={colors.grid}
-          strokeWidth={2}
-        />
-        <line
-          x1={PADDING + 5 * CELL_SIZE}
-          y1={PADDING + 7 * CELL_SIZE}
-          x2={PADDING + 3 * CELL_SIZE}
-          y2={PADDING + 9 * CELL_SIZE}
-          stroke={colors.grid}
-          strokeWidth={2}
-        />
-
-        {/* Valid move indicators */}
-        {validMoves?.map((pos, index) => (
-          <circle
-            key={`valid-move-${index}`}
-            cx={PADDING + pos.file * CELL_SIZE}
-            cy={PADDING + pos.rank * CELL_SIZE}
-            r={CELL_SIZE * 0.12}
-            fill="#22c55e"
-            opacity="0.8"
-            data-testid="valid-move-indicator"
-          />
-        ))}
-
-        {/* Selected position highlight */}
-        {selectedPosition && (
-          <rect
-            x={PADDING + selectedPosition.file * CELL_SIZE - CELL_SIZE * 0.45}
-            y={PADDING + selectedPosition.rank * CELL_SIZE - CELL_SIZE * 0.45}
-            width={CELL_SIZE * 0.9}
-            height={CELL_SIZE * 0.9}
-            fill="#22c55e"
-            opacity="0.4"
-            data-testid="selected-position"
-          />
-        )}
+        {/* Cross marks */}
+        {renderCrossMarks()}
 
         {/* Last move highlight */}
-        {lastMove && (
-          <>
-            <rect
-              x={PADDING + lastMove.from.file * CELL_SIZE - CELL_SIZE * 0.45}
-              y={PADDING + lastMove.from.rank * CELL_SIZE - CELL_SIZE * 0.45}
-              width={CELL_SIZE * 0.9}
-              height={CELL_SIZE * 0.9}
-              fill="#3b82f6"
-              opacity="0.3"
-              data-testid="last-move-highlight"
-            />
-            <rect
-              x={PADDING + lastMove.to.file * CELL_SIZE - CELL_SIZE * 0.45}
-              y={PADDING + lastMove.to.rank * CELL_SIZE - CELL_SIZE * 0.45}
-              width={CELL_SIZE * 0.9}
-              height={CELL_SIZE * 0.9}
-              fill="#3b82f6"
-              opacity="0.3"
-              data-testid="last-move-highlight"
-            />
-          </>
-        )}
+        {renderLastMoveHighlight()}
 
-        {/* In check indicator - pulsing red circle around general */}
-        {inCheck && (
-          <g>
-            <circle
-              cx={PADDING + inCheck.file * CELL_SIZE}
-              cy={PADDING + inCheck.rank * CELL_SIZE}
-              r={CELL_SIZE * 0.6}
-              fill="#ef4444"
-              opacity="0.3"
-              className="animate-ping"
-            />
-            <circle
-              cx={PADDING + inCheck.file * CELL_SIZE}
-              cy={PADDING + inCheck.rank * CELL_SIZE}
-              r={CELL_SIZE * 0.55}
-              fill="none"
-              stroke="#ef4444"
-              strokeWidth="3"
-              opacity="0.8"
-              className="animate-pulse"
-            />
-            <text
-              x={PADDING + inCheck.file * CELL_SIZE}
-              y={PADDING + inCheck.rank * CELL_SIZE - CELL_SIZE * 0.7}
-              textAnchor="middle"
-              fill="#ef4444"
-              fontSize="20"
-              fontWeight="bold"
-              className="animate-bounce"
-            >
-              将军！
-            </text>
-          </g>
-        )}
+        {/* Selected position */}
+        {renderSelectedHighlight()}
 
-        {/* Clickable intersection areas */}
-        {Array.from({ length: RANKS }, (_, rank) =>
-          Array.from({ length: FILES }, (_, file) => (
-            <circle
-              key={`click-${file}-${rank}`}
-              cx={PADDING + file * CELL_SIZE}
-              cy={PADDING + rank * CELL_SIZE}
-              r={CELL_SIZE * 0.45}
-              fill="transparent"
-              className="cursor-pointer"
-              role="button"
-              aria-label={`Position ${file},${rank}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePositionClick(file, rank);
-              }}
-            />
-          ))
-        )}
+        {/* Valid move indicators */}
+        {renderValidMoves()}
 
-        {/* Grid intersection dots for visual clarity */}
-        {Array.from({ length: RANKS }, (_, rank) =>
-          Array.from({ length: FILES }, (_, file) => {
-            // Skip center area where palace diagonals are
-            const inPalace = (file >= 3 && file <= 5) && ((rank >= 0 && rank <= 2) || (rank >= 7 && rank <= 9));
-            if (inPalace) return null;
-            
-            return (
-              <circle
-                key={`dot-${file}-${rank}`}
-                cx={PADDING + file * CELL_SIZE}
-                cy={PADDING + rank * CELL_SIZE}
-                r={4}
-                fill={colors.grid}
-                opacity="0.6"
-              />
-            );
-          })
-        )}
+        {/* Check indicator */}
+        {renderCheckIndicator()}
+
+        {/* Pieces */}
+        {renderPieces()}
+
+        {/* Clickable targets (on top of everything) */}
+        {renderClickTargets()}
       </svg>
-
-      {/* Pieces - rendered as absolute positioned elements over the SVG */}
-      <div 
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          padding: '20px', // Match parent padding
-        }}
-      >
-        {pieces.map((piece) => {
-          // Calculate exact pixel position within the container
-          const containerWidth = width;
-          const containerHeight = height;
-          
-          // Position in SVG coordinates (with optional flip)
-          const svgX = PADDING + piece.position.file * CELL_SIZE;
-          const svgY = PADDING + getDisplayRank(piece.position.rank) * CELL_SIZE;
-          
-          // Convert to percentage
-          const leftPercent = (svgX / containerWidth) * 100;
-          const topPercent = (svgY / containerHeight) * 100;
-
-          return (
-            <div
-              key={`${piece.type}-${piece.color}-${piece.position.file}-${piece.position.rank}`}
-              className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110 pointer-events-auto"
-              style={{
-                left: `${leftPercent}%`,
-                top: `${topPercent}%`,
-                width: '8%',
-                aspectRatio: '1',
-                zIndex: 10,
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePositionClick(piece.position.file, piece.position.rank);
-              }}
-            >
-              <PieceView 
-                type={piece.type} 
-                color={piece.color} 
-                size={undefined}
-                className="w-full h-full"
-              />
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 };

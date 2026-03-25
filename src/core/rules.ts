@@ -67,8 +67,8 @@ export function getAllLegalMovesFiltered(board: Board, color: Color): Move[] {
   return moves;
 }
 
-function hasAnyLegalMoves(board: Board, _color: Color): boolean {
-  const pieces = getPiecesByColor(board, Color.Red);
+function hasAnyLegalMoves(board: Board, color: Color): boolean {
+  const pieces = getPiecesByColor(board, color);
   for (const piece of pieces) {
     const moves = getLegalMoves(board, piece.position);
     if (moves.length > 0) return true;

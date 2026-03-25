@@ -1,7 +1,7 @@
 /**
  * PieceView Component - Renders a Chinese Chess piece
- * 
- * Supports multiple skin types: traditional (text), symbol, minimal
+ *
+ * Kept for backward compatibility / standalone usage outside the board SVG.
  */
 
 import React from 'react';
@@ -15,26 +15,14 @@ interface PieceViewProps {
   style?: React.CSSProperties;
 }
 
-// Traditional Chinese character labels
 const TRADITIONAL_LABELS: Record<PieceType, { red: string; black: string }> = {
-  general: { red: '帥', black: '將' },
-  advisor: { red: '仕', black: '士' },
+  general:  { red: '帥', black: '將' },
+  advisor:  { red: '仕', black: '士' },
   elephant: { red: '相', black: '象' },
-  horse: { red: '馬', black: '馬' },
-  chariot: { red: '車', black: '車' },
-  cannon: { red: '炮', black: '砲' },
-  soldier: { red: '兵', black: '卒' },
-};
-
-// Symbol labels (Unicode chess-like symbols)
-const SYMBOL_LABELS: Record<PieceType, string> = {
-  general: '♔',
-  advisor: '♕',
-  elephant: '♗',
-  horse: '♘',
-  chariot: '♖',
-  cannon: '♜',
-  soldier: '♟',
+  horse:    { red: '馬', black: '馬' },
+  chariot:  { red: '車', black: '車' },
+  cannon:   { red: '炮', black: '砲' },
+  soldier:  { red: '兵', black: '卒' },
 };
 
 export const PieceView: React.FC<PieceViewProps> = ({
@@ -45,50 +33,23 @@ export const PieceView: React.FC<PieceViewProps> = ({
   style,
 }) => {
   const label = TRADITIONAL_LABELS[type][color];
-  const colorClass = color === 'red' ? 'text-chess-red' : 'text-chess-black';
+  const isRed = color === 'red';
 
   return (
     <div
       role="img"
       aria-label={`${color} ${type}`}
-      className={`rounded-full bg-amber-100 border-2 border-amber-800 
-                  flex items-center justify-center font-bold shadow-md
-                  ${colorClass} ${className}`}
+      className={`rounded-full flex items-center justify-center font-bold shadow-md ${className}`}
       style={{
         width: size,
         height: size,
-        fontSize: size * 0.6,
+        fontSize: size * 0.55,
         lineHeight: 1,
+        background: '#FFF5E6',
+        border: '2px solid #5C3317',
+        color: isRed ? '#CC0000' : '#1A1A1A',
+        fontFamily: 'KaiTi, STKaiti, SimSun, serif',
         ...style,
-      }}
-    >
-      {label}
-    </div>
-  );
-};
-
-// Alternative symbol-based piece view
-export const SymbolPieceView: React.FC<PieceViewProps> = ({
-  type,
-  color,
-  size = 48,
-  className = '',
-}) => {
-  const label = SYMBOL_LABELS[type];
-  const colorClass = color === 'red' ? 'text-chess-red' : 'text-chess-black';
-
-  return (
-    <div
-      role="img"
-      aria-label={`${color} ${type}`}
-      className={`rounded-full bg-amber-100 border-2 border-amber-800 
-                  flex items-center justify-center shadow-md
-                  ${colorClass} ${className}`}
-      style={{
-        width: size,
-        height: size,
-        fontSize: size * 0.7,
-        lineHeight: 1,
       }}
     >
       {label}
